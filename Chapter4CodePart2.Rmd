@@ -1,0 +1,516 @@
+---
+title: 'Longitudinal Data: Fixed Covariates, Time-dependent Outcomes'
+subtitle: 'Binary Outcomes Part 1'
+author: Alan Hubbard
+date: Sept 18, 2018
+output: 
+  slidy_presentation:
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Converting repeated binary outcomes to a count (number of events)
+* Repeated yes/no measurements on subjects.
+* Interested in the association of baseline variables and the outcome of interest.
+* Does not make sense to do if there are time-dependent covariates of interest.
+* Summing the number of events and then  modeling counts as function of baseline covariates.
+
+
+
+---
+
+# Water Intervention Trial for HIV+ patients
+
+* Subjects randomized to either device which filters out pathogens or a similar looking placebo devices.
+
+* Subjects record daily whether or not they have a gastro-intestinal episode (yes/no)
+
+* Purpose is to determine the amount of GI illness attributable to drinking water.
+
+---
+
+```{r load1B,  warning=FALSE,message=FALSE}
+# Load libraries and read in data
+library(ggplot2)
+library(data.table)
+library(tidyverse)
+dat=read_csv("HIVWet.csv")
+## Look at data
+tbl_df(dat)
+
+```
+
+---
+
+## Transform into one row per id with outcome total number of hcgi episodes 
+
+- Sum up the number of episodes to make an overall count.
+
+- In the water trial example, calculate the number of GI episodes per person.
+
+- In notation, if $Y_{ij}$ is the jth measurement on the ith person and $Y_{ij} = 0$ (no) or 1 (yes), then make a new variable $Y_i$:
+$$
+Y_i \equiv \sum_{j=1}^{n_i} Y_{ij}
+$$
+
+- We will account for different number of time intervals ($n_i$) among subjects. 
+
+---
+
+```{r reshapeB}
+dat4 <- group_by(dat, id) %>% 
+  mutate(tot_obs=n()) %>% 
+  mutate(tot_notNA = sum(!is.na(hcgi)))  %>% 
+  mutate(tot_hcgi = sum(hcgi,na.rm=T)) %>% 
+  mutate(obs = rank(studyday)) %>% 
+  ungroup() %>% 
+  filter(obs==1)
+  
+  dat5 <- select(dat4,id,group2,tot_notNA,tot_hcgi) 
+## Look at data
+tbl_df(dat5)
+```
+
+# Distribution of counts
+
+* For regression (coming next) we will assume different distribution models for total counts.
+
+* We need distributions for random variables that are integers from 0 to a big number. 
+
+* One very common (and very simple) distribution is the Poisson, or:
+\[
+P(Y=y) = \frac{\lambda^y e^{-y}}{y!}
+\]
+with y!=y*(y-1)* ... 2*1.  
+
+* Thus, one only need to know the $\lambda$ (one parameter) to know the probability of any count (0,1,2,.....).
+
+
+* $\lambda$ is sometimes called the "rate of events", and is both the mean and the variance $E(Y)=var(Y)=\lambda$.
+
+---
+
+## Examples of count data where the Poisson distribution as been used
+
+* Number of automobile fatalities in a given region over a year.
+
+* Number of AIDS cases for a given risk group for a month
+
+* Number of earthquakes of a given size range in a region by decade.
+
+* Counts of some event-process where the instantaneous rate (hazard) is assumed to be constant.
+
+---
+
+## Calculation of Poisson probabilities
+* Not that $\lambda$ has an associated time interval (it is the average count per some unit of time).  
+* If the distribution of a random variable $Y$ is Poisson with rate $\lambda$, or $Y \sim Poisson(\lambda)$ for one unit of time (say one day), then the distribution of counts for the count $t$ units of time ($t$ days), say $Z$ is $Z \sim Poisson(t*\lambda)$
+
+* For instance, assume the injury from car accident rate in a town is 
+$\lambda =$ 0.00024/person/year.
+
+* Then, the mean rate for a town of $t=10000$ people is $\lambda*t = 10000*0.00024 = 2.4/year$.
+
+---
+
+* The distribution of counts per year for the town of 10000 is:
+$$ P(Y = 0) = \frac{2.4^0 e^{-2.4}}{0!} = `r dpois(0,2.4)`, $$
+
+$$ P(Y=1) = \frac{2.4^1 e^{-2.4}}{1!} `r dpois(1,2.4)`, $$ 
+
+$$ P(Y > 1) = 1-P(Y=0)-P(Y=1) = `r ppois(1,2.4,lower.tail=F) ` .$$ 
+
+
+```{r plotPois}
+x=0:20
+pois_prob=dpois(x,2.4)
+p <- ggplot(data.frame(x=x, y=pois_prob), aes(x, y)) 
+p + geom_bar(stat="identity")+labs(x = "y",y="P(Y=y)")+ggtitle(expression(paste("Poisson Distribution with ", lambda,' = 2.4')))
+```
+
+---
+
+## Estimating the one parameter $\lambda$ from data
+* Assume one observed m independent counts (all over same length of time for now) all from the same Poisson distribution.
+
+* The maximum likelihood estimate is:
+Just the average number of counts.
+
+$$
+\hat{\lambda} = \frac{Y_1+Y_2+ \cdots Y_m}{m}
+$$
+
+* Show as solution to minimizing log-likelihood.
+
+---
+
+## Silly Soccer Example
+* Below we read in some data on the number of teams in a game that scored the corresponding number of goals in the 1966 World Cup.   
+
+    + e.g., 18 times a team scored 0 goals in all the games in the World Cup of that year.  
+    
+* There were a total of 32 games, which means there are 64 total entries in the table (2 teams in each game, both contribute to table).
+
+```{r soccer1}
+soccer_dat <- read_csv("soccer.csv")
+soccer_dat <- filter(soccer_dat,Observed > 0)
+as.tibble((soccer_dat))
+# Now we expand to look more like the original data (before collapsed)
+goals=rep(unlist(soccer_dat$NumberGoals),unlist(soccer_dat$Observed))
+# Note, it's 64, the number of team/games
+length(goals)
+# get estimate of lambda (the average)
+lambda_hat=mean(goals)
+lambda_hat
+```
+
+---
+
+## Calculations of Poisson Probabilities from $\hat{\lambda}$
+
+- 32 games, so 64 counts of number of goals/game for one team.
+- Total number of goals is `r sum(goals)`, so the average number is `r round(lambda_hat,2)` $$ = \bar{Y} = \hat{\lambda}$$.
+- Estimated prob. of no goals for one team is $$ P_{\hat{\lambda}}(Y = 0) = \frac{1.39^0 e^{-1.39}}{0!} = `r round(dpois(0,1.39),2)` $$
+- The estimated expected number of times in 64 team scores we see zero goals is $$ `r round(dpois(0,1.39),2)` * 64 = `r round(dpois(0,1.39)*64,2)`$$
+
+# One binary exposure (e.g., treatment $X=1$ - yes, or $X=0$ - no).
+
+- As an example, use the water intervention trials.
+
+- Let X=0 (placebo) or 1 (active device)
+
+- Consider the model for the mean rate
+
+$$ E(Y \mid X) = \lambda(X) = exp(\beta_0+\beta_1*X) $$
+
+- Why model the log rate and not the rate?
+
+---
+
+## Interpretation of Regression Coefficients
+- The mean rate when $X=0$ is: 
+$$ E(Y \mid X=0) = \lambda(0)= exp(\beta_0) $$
+- The mean rate when $X=1$ is:
+$$ E(Y \mid X=1) = \lambda(1)=exp(\beta_0+\beta_1) $$
+- so 
+ $$ \beta_1 = log(\lambda(1))- log(\lambda(0)) = 
+ log(\lambda(1)/\lambda(0))=$$ log ratio of means comparing $X=0$ to $X=1$.
+ 
+- Thus,  $$ exp(\beta_1) $$ ratio of means, sometimes called an incident rate ratio (IRR).
+
+---
+
+## Estimation of regression coefficients for single binary covariate
+
+- In general (in additive model), the non-intercept coefficients represent the log(IRR) for a unit increase of the corresponding covariate.
+
+- Estimates of the coefficients come just from estimates of the means in each group ($X=1$ and $X=0$).
+
+$$ \hat{\lambda}(0) = \frac{\sum_{i=1}^m Y_i(1-X_i)}{\sum_{i=1}^m (1-X_i)}$$
+
+$$\hat{\lambda}(1) = \frac{\sum_{i=1}^m Y_i*X_i}{\sum_{i=1}^m X_i}$$
+
+$$ \hat{\beta_0} = log(\hat{\lambda}(0)) $$
+
+$$ \hat{\beta_0} = log(\hat{\lambda}(1))-log(\hat{\lambda}(0)) $$
+
+- For general model (with possibly several covarites) use generalized linear models (glm) approach.
+
+# Different follow-up periods
+- More typically, people are followed for different time periods, as in the water intervention trials.
+
+- Suppose rate per unit time is assumed to be $\lambda$, and follow-up for an individual is of length, $T$.
+
+- Then, counts of events in period $[0,T]$ is then Poisson with rate parameter $\lambda*T$.
+
+- The Poisson distribuiton for counts of events over intervals  of time implies the exponential distribution for the time to the event for each unit in population.
+
+- Again, assume one observed $m$ independent counts $(Y_1,...,Y_m)$ with corresponding follow-up periods $(T_1, T_2, ..., T_m)$.
+
+The MLE estimate of the rate parameter is:
+
+$$
+\hat{\lambda} = \frac{Y_1+Y_2+ \cdots +Y_m}{T_1+T_2+ \cdots +T_m} = \frac{\textrm{Total Number of Events}}{\textrm{Total Amount of Time}}
+$$
+
+---
+
+## Use of offset to adjust for differing time periods for counts recorded (different T's)
+
+- In many studies, like the HIV WET trial, different subjects are observed for different lengths of time, $T$.
+
+- Consider the same covariate ($X=0,1$ corresponds to  placebo, active) and underlying model for the mean for a one unit of time (a day in the case o the HIV WET trial):
+
+$$ \lambda(X) = exp(\beta_0+\beta_1*X) $$
+
+- Then, over a follow-up period of length $T$, the  mean rate is:
+
+$$ E(Y \mid X,T) = T*exp(\beta_0+\beta_1*X) = \lambda(X,T) $$
+
+- so,
+
+$$ log(\lambda(X,T))=log(T)+\beta_0+\beta_1*X $$
+
+- Thus, adjusting for differing follow-up time if assuming a Poisson distribution of counts is done by simply adding $log(T)$ as special covariate with coefficient fixed at 1 (not estimated), sometimes called an **offset**.
+
+---
+
+## Look at rate by group
+```{r ir1}
+
+## Look at data after making it counts and total time
+tbl_df(dat5)
+
+HIVWET_sum <- 
+  dat5 %>% group_by(group2) %>% 
+  
+  summarise(total_subs = n(),total_events=sum(tot_hcgi),total_time=sum(tot_notNA)) %>%
+  mutate(rate_by_group = round(total_events/total_time,3))
+  
+HIVWET_sum
+
+
+```
+
+Thus, one can see that the rates are almost identical in the two groups, implying very little impact from the filter.
+
+---
+
+## Poisson Regression
+- We now use glm to fit a log-linear model assuming a Poisson distribution in the counts in treatment groups.  We will parameterize below the treatment variable to be $X=0$ (water treated) and $X=1$ (water untreated).
+
+- Thus, the $\beta_1$ will represent the log(IRR) for untreated over treated.  Thus, if it is less than 0, the untreated group has less HCGI events, and visa versa if greater than 0.
+
+
+```{r pois_reg}
+glm_pois <- glm(tot_hcgi~group2+offset(log(tot_notNA)),data=dat5,family=poisson())
+sum_glm_pois <- summary(glm_pois)
+sum_glm_pois
+```
+
+The summary says that the estimate of $\beta_1$ is `r round(coef(glm_pois)[2],2)` with p-value of `r round(sum_glm_pois$coefficients[2,4],4)`
+
+---
+
+```{r pois_reg2, message=F,warning=F}
+
+## Function for Contrasts - below is a user-written function to
+## read in results from glm regressions and return estimates based
+## upon specified linear combinations of coefficients.
+
+glm.post.estimate=function(glmob,comps,rounded=3,exponentiate=FALSE) {
+    if(is.matrix(comps)==FALSE) {
+      comps=t(as.matrix(comps))}
+	vc=vcov(glmob)
+	ests = coef(glmob)
+	linear.ests=as.vector(comps%*%ests)
+	vcests=comps%*%vc%*%t(comps)
+	ses=sqrt(diag(vcests))
+    pvalue=(2*(1-pnorm(abs(linear.ests/ses))))
+    if(exponentiate) {
+      l95ci = exp(linear.ests - 1.96 * ses)
+      exp_beta = exp(linear.ests)
+      u95ci = exp(linear.ests + 1.96 * ses)
+      summ = cbind(Ratio.est=round(exp_beta,rounded),CI=paste(round(l95ci,rounded),round(u95ci,rounded),sep=" - "), pvalue=round(pvalue,rounded+1))        
+      }
+          if(exponentiate==FALSE) {
+      l95ci = (linear.ests - 1.96 * ses)
+      beta = (linear.ests)
+      u95ci = (linear.ests + 1.96 * ses)
+      summ = cbind(Est=round(beta,rounded),CI=paste(round(l95ci,rounded),round(u95ci,rounded),sep=" - "), pvalue=round(pvalue,rounded+1))        
+      }
+      return(summ) }
+
+## Look at comparing untreated to treated, or 
+comps <- c(0,1)
+irr_pois <- glm.post.estimate(glm_pois,comps,exponentiate = T)            
+irr_pois
+```
+
+- Thus, we see the estimate mean (rate) ratio is $IRR = `r irr_pois[1]`$ with 95\% CI `r irr_pois[2] `. 
+
+---
+
+## Summarizing Poisson Regression
+
+- Generalizing to multiple covariates with different forms (e.g., continuous, categorical) is no different than for linear models.
+
+- Note, we are thus far interested in functions of the conditional mean of the outcome, given covariates, and not necessarily the entire distribution.
+
+- Poisson is a very strong assumption used to get the inference (the standard errors) for the estimates (i.e., $var(Y|X) = E(Y|X)$).
+
+- Often times this assumption is anti-conservative (the true confidence interal should be wider than the one Poisson regression returns)
+
+- There are other distributions that can be less anti-conservative, such as the negative binomial distribution (up next).
+
+- One can also use nonparametric methods to get the SE's, such as the bootstrap, and these do not rely on any distributional assumptions.
+
+# Negative Binomial Regression
+- First we introduce the negative binomial distribution.
+
+- It can be motivated in a few ways, one is a coin-flip experiment.
+    + specify the number of  $Z_i=1$  (heads) you want to see at the end of the experiment (say $r$) and
+    + count the total number of trials it takes to get to $r$, say $Y$.  
+    + Calculate $P(Y=k)$ by adding up all probabilities of joint events such that 1) $\sum_{i=1}^k Z_i = r$ and 2) $Z_k=1$:  the last one is an event (heads).  
+    + Any ordering of 0's and 1's for the $Z_i$ up to the (k-1)th trial works if it satisfies $\sum_{i=1}^{k-1} Z_i =r-1$, which is a simple binomial experiment.
+$$
+{k-1 \choose r-1}p^{r-1} (1-p)^{k-1-(r-1)}={k-1 \choose r-1} p^{r-1}(1-p)^{k-r}
+$$
+
+    + Only one event is allowed for the kth trial, which is that $Z_k=1$ and that probability is simply $p$, so multiplying this, to above we get:
+
+$$
+P(Y=k) = {k-1 \choose r-1}p^{r} (1-p)^{k-r}
+$$
+
+---
+
+## Negative binomial as generalization of Poisson
+
+- Poisson regression assumes that all subjects with the same covariates have the same underlying rate.
+
+- However, situations often arise when we expect the underlying mean rate of people within covariate groups will vary (the water Tx study is one such case, given the only covariate is Tx).
+
+- For instance, we might thing of the population within a specific treatment group as having a mean rate of HCGI, but the individual’s rates vary around this mean.
+
+---
+
+## Negative binomial as mixture of Poissons
+- Let subject i have a rate of HCGI of $\Lambda_i$,
+- Assume that, given this rate, the  distribution of HCGI events is Poisson:
+$$
+P(Y_i=y)=\frac{{\Lambda_i}^y e^{-\Lambda_i}}{y!}
+$$
+- Assume that the mean of the rates, $\Lambda_i$ in the population is $E(\Lambda_i)=\lambda$.
+
+- If we also assume that the distribution of these rates $\Lambda_i$ is the so-called gamma distribution:
+$$
+f_{\nu,\lambda}(\Lambda)=\frac{\Lambda^{\nu-1}e^{-\Lambda \nu / \lambda}}{(\frac{\lambda}{\nu})^\nu \Gamma(\nu)},
+$$
+then the marginal distribution (averaging over all the subjects in the population) of counts in a randomly selected individual is negative binomial.
+
+---
+
+## Negative binomial as mixture
+- Thus, the negative binomial is a so-called **mixture model**, in that it is a mixture of Poisson distributions:
+$$
+P_{\nu,\lambda}(Y=y) = (\frac{\nu}{\nu+\lambda})^\nu \frac{\Gamma(\nu+y)}{\Gamma(y+1)\Gamma(\nu)}(\frac{\lambda}{\nu+\lambda})^y,
+$$
+where $\Gamma(x)$ is the gamma function, where, if x is an integer, then $\Gamma(x+1)=x!$.
+
+- $E(Y)=\lambda$ and  $var(Y)=\lambda+\lambda^2/\nu$ 
+
+-  $var(Y) = var\{E(Y|\Lambda)\}+E\{var(Y|\Lambda)\} = var(\Lambda)+E(\Lambda)=\lambda+\lambda^2/\nu$
+
+-  $\nu$ is referred to as dispersion parameter.
+
+---
+
+## Different parameterizations of the negative binomial distribution
+
+- Mixture: 
+$$
+P_{\nu,\lambda}(Y=y) = (\frac{\nu}{\nu+\lambda})^\nu \frac{\Gamma(\nu+y)}{\Gamma(y+1)\Gamma(\nu)}(\frac{\lambda}{\nu+\lambda})^y,
+$$
+
+- Coin flip:
+
+$$
+{k-1 \choose r-1}p^{r-1} (1-p)^{k-1-(r-1)}={k-1 \choose r-1} p^{r-1}(1-p)^{k-r}
+$$
+
+-  $E(Y)=\lambda=\frac{pr}{1-r}$
+
+-  $var(Y)=(\lambda+\lambda^2/\nu)=pr/(1-p)^2$
+
+---
+
+### Negative binomial distribution with same mean ($\lambda$), but different dispersions ($\nu$) 
+
+```{r plotNB, message=F,warning=F}
+x=0:20
+nb.dat=tibble(x=x,nb_prob = dnbinom(x, size=100, mu=2.4),disp=100)
+nb.dat=bind_rows(nb.dat,tibble(x=x,nb_prob=dnbinom(x, size=10, mu=2.4),disp=10))
+nb.dat=bind_rows(nb.dat,tibble(x=x,nb_prob=dnbinom(x, size=1, mu=2.4),disp=1))
+nb.dat=bind_rows(nb.dat,tibble(x=x,nb_prob=dnbinom(x, size=0.5, mu=2.4),disp=0.5))
+
+
+p <- ggplot(nb.dat, aes(x=x, y=nb_prob,group=as.factor(disp),color=as.factor(disp)))
+p + geom_line()+ylab("P(X=x)")+guides(fill=guide_legend(title="dispersion"))
+
+```
+
+---
+
+## NB vs. Poisson regression
+
+- Poisson is a sub-model of the NB, so you're always more unbiased in estimation of distribution if you assume bigger model, e.g., in $var(Y|X) = \lambda(X)+\lambda^2(X)/\nu$ goes to $\lambda(X)$ as $\nu$ goes to infinity and thus to Poisson distribution.
+
+- In practice, Poisson, if misspecified because of true **over-dispersion**, under-estimates the variability of the outcome, whereas the NB can incorporate the over-dispersion into the inference (e.g., 95 \% CI's) provided.
+
+- You can also look at the relative fit of the two models using a penalized likelihood statistic, such as Aikaike's Information Criterion (AIC).
+
+- In gerenal, if there's a choice, relatively better inference using NB over Poisson assumption.
+
+- Finally, the output for the mean model returned by NB regression is precisely as we discussed above for the Poisson model - i.e., it uses a log-linear link model for regression 
+
+$$ \lambda(X) = exp(\beta_0+\beta_1*X) $$
+
+---
+
+## Fit NB Regression to HIVWET data
+
+```{r NBReg, message=F,warning=F}
+library(MASS)
+glm_NB <- glm.nb(tot_hcgi~group2+offset(log(tot_notNA)),data=dat5)
+sum_glm_NB <- summary(glm_NB)
+sum_glm_NB
+
+
+# write_csv(dat5, path = "dat5.csv")
+
+
+comps <- c(0,1)
+irr_NB <- glm.post.estimate(glm_NB,comps,exponentiate = T)            
+irr_NB
+
+
+```
+
+---
+
+- Recall, for the Poisson, we had the estimate of $\beta_1$ is `r round(coef(glm_pois)[2],2)` with p-value of `r round(sum_glm_pois$coefficients[2,4],4)`; whereas for NB regression the estimate of the coefficient changed a little (`r round(coef(glm_NB)[2],2)`) and the p-value became bigger (p = `r round(sum_glm_NB$coefficients[2,4],4)`).  
+
+- The most important difference here is in the standard error differences, whereas the $SE(\beta_1) = `r round(sum_glm_NB$coefficients[2,2],2) `$ in the NB regression is much bigger than that estimated in the Poisson regression (`r round(sum_glm_pois$coefficients[2,2],2) `).
+
+- We can also look at whether the difference is statistically significant
+
+```{r lmtest, message=F,warning=F}
+library("lmtest")
+lrtest(glm_NB, glm_pois)
+```
+
+---
+
+- This can be seen as a test of the dispersion parameter is very, very big (so Poisson is a sufficient fit): 
+    $$H_0: \nu = \infty $$.
+
+- The p-value then, if the assumptions of the test are met, can be seen as a test $H_0: \textrm{dist=Poisson}$ or equivalently above.
+
+- Given that there is little association of the treatment and the outcome, it makes sense to look at the marginal distribution and see which fits best to the data.
+
+---
+
+```{r NB_vs_Pois, message=F,warning=F}
+dat6=mutate(dat5,obs_rate=tot_hcgi/tot_notNA)
+ggplot(dat6, aes(x=obs_rate*100)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Distribution of rates per 100 days in HIVWET Study") +xlab("rates")+ geom_vline(xintercept =mean(dat6$obs_rate*100),size=1) 
+
+```
+
+- The vertical line is at the mean
+
+- This shows that the data is highly skewed and this supports the better fit of the NB relative to the Poisson distribution.
+

@@ -1,0 +1,354 @@
+---
+title: 'Longitudinal Data: Graphics'
+output: pdf_document
+#  beamer_presentation: default
+#  slidy_presentation: default
+---
+
+# Introduction
+Below, we introduce how to create plots most commonly used in longitudinal studies, including line plots, bar plots, smooths, etc.
+```{r}
+library(ggplot2)
+library(data.table)
+```
+
+Read in data
+
+```{r read1, warning=FALSE, message=FALSE}
+dat=read.csv("cd4data.csv")
+```
+Now, make a line plot of CD4 count versus time for all subjects.
+```{r allsubs, warning=FALSE, message=FALSE}
+p <- ggplot(data = dat, aes(x = etime, y = cd4, group = id))
+p + geom_line()
+```
+
+* As one can see, there is too much information for one plot, though some rough patterns (such as the ranges of cd4, some since of most subjets having values below 500, etc).  
+* Thus, we now discuss methods for targeted reductions of the data that use as little data as possible, but still tell an accurate story of the patterns.
+
+# Methods for Raw Data Plots
+For the first method, we simply randomly sample a number of subjects and plot the same data with this reduced set.  Just grabbing random subjects can be an inefficient way to explore the data, so we'll suggest other data-driven sampling methods next.
+```{r random1, warning=FALSE, message=FALSE}
+# get unique id's
+ids = unique(dat$id)
+# nsub is number of subjects I wish to grab
+nsub = 30
+# make a random list of these id's
+randid = sample(ids,nsub,replace=F)
+# new data set to merge with original 
+iddat = data.frame(id = randid,plot=T)
+# merge to get column with plot indicator
+newdat = merge(dat,iddat,by=1,all=T)
+# Make the plot
+p <- ggplot(data = subset(newdat,plot==T), aes(x = etime, y = cd4, group = id))
+p + geom_line()
+
+```
+
+Now, it's easier to see distinctive patterns, and one can see a fair amount of volalitility in the CD4 over time, particularly among those with higher CD4 counts (the lower the counts, the lower the volatility).  However, if one is only selecting a small sample of the observations, then a random sample does not represent a representative sample.  Thus, we can sample more systematically if we want to ensure some uniformity in representation.
+
+
+
+```{r rankmeans, warning=FALSE, message=FALSE}
+# Function to return average that allows missing data
+mean.na=function(x){mean(x,na.rm=T)}
+# get average cd4 by subject id
+meancd4=tapply(dat$cd4,dat$id, mean.na)
+# make data frame where we have an id column and the ave cd4 that is merger
+# with original data
+meancd4 = data.frame(as.numeric(rownames(meancd4)),meancd4)
+names(meancd4)=c("id","avecd4")
+# order by increasing ave cd4
+oo=order(meancd4$avecd4)
+meancd4=meancd4[oo,]
+# number of id's
+n = dim(meancd4)[1]
+# Get 20 evenly spaced subjects across ranks with regard to ave cd4
+meancd4=meancd4[seq(1,n,ceiling(n/20)),]
+# merge back (1 to many) to original data but only for id's selected above
+meancd4=merge(meancd4,dat,by=1,all.x=T,all.y=F)
+# plot new subset adding color gradient by ave cd4
+p <- ggplot(data = meancd4, aes(x = etime, y = cd4, group = id,color=avecd4))
+p + geom_line()
+```
+As one can see from plot, there is now a more even representation of the lines, from those close to 0 to those with highest averages.
+
+# Methods for Processed (modeled) Data Plots
+Sometimes one can reveal patterns in the data more clearly if the data are modeled to remove noise, or simply "smoothed" to eliminate some of the nuisance variation.  We start by fitting a simple linear regression to CD4 over time separately by id.  This can be done many different ways, but we show one via a more recently developed package that is very convenient for operations on structured data.  data.table inherits from data.frame. Specifically (from the help file) it offers fast and memory efficient: file reader and writer, aggregations, updates, equi, non-equi, rolling, range and interval joins, in a short and flexible syntax, for faster development. It is inspired by A\[B\] syntax in R where A is a matrix and B is a 2-column matrix. Since a data.table is a data.frame, it is compatible with R functions and packages that accept only data.frames.
+
+```{r line1, warning=FALSE, message=FALSE}
+# Convert to 
+dat2=data.table(dat)
+##first, make a function that returns coefficients in a regression
+lin.reg=function(y,x) {
+  lm1=lm(y~x,na.action=na.omit)
+  coeftmp=coef(lm1)
+  pp=predict(lm1,newdata=data.frame(x=c(min(x,na.rm=T),max(x,na.rm=T))))
+  out=c(coeftmp,pp,min(x,na.rm=T),max(x,na.rm=T))
+ names(out)=c("int","slope","Y1","Y2","X1","X2")
+  return(out)
+}
+dat.reg=    
+dat2[,as.list(lin.reg(cd4,etime)),by=.(id)]
+
+par(mfrow=c(1,2))
+ggplot(dat.reg, aes(x=int)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Intercepts") +xlab("CD4")+ geom_vline(xintercept =mean(dat.reg$int),size=2) 
+
+
+ggplot(dat.reg, aes(x=slope)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666")+geom_vline(xintercept =mean(dat.reg$slope),size=2)+geom_vline(xintercept =0,size=1)
+
+
+
+```
+Next, we plot the fitted lines by id, taking a random set.   To do so, it' most convenient to have the data in long form.  Since we already saved the predicted values at the limits of the distribution of time for each person using their individually fit linear regressions, we can expand dat.reg into "long" form so that there is two rows per id, first row has predicted value at minimum time, 2nd row the same at the maximum time.  We can use the "melt" function to do so.
+
+```{r line2, warning=FALSE, message=FALSE}
+dat.reg.long = melt(dat.reg, measure.vars = list(c("X1","X2"),c("Y1","Y2")), variable.name = "obs", value.name = c("time","cd4"))
+# Re-order data.table by time within id.
+setorder(dat.reg.long,id,time)
+```
+
+Now, we can use the same plotting commands we used above.  However, we will also choose a random sample of 30 id's as we have done before. 
+
+```{r line3, warning=FALSE, message=FALSE}
+# get unique id's
+ids = unique(dat.reg.long$id)
+# nsub is number of subjects I wish to grab
+nsub = 30
+# make a random list of these id's
+randid = sample(ids,nsub,replace=F)
+# new data set to merge with original 
+iddat = data.frame(id = randid,plot=T)
+# merge to get column with plot indicator
+newdat = merge(dat.reg.long,iddat,by="id",all=T)
+# Make the plot, coloring line by slope
+p <- ggplot(data = subset(newdat,plot==T), aes(x = time, y = cd4, group = id,color=slope))
+p + geom_line()
+
+```
+
+We repeat by order by slope and then sample evenly to get better representation of the slopes from a subset of individuals.
+
+```{r line4, warning=FALSE, message=FALSE}
+setorder(dat.reg,slope)
+n=dim(dat.reg)[1]
+dat.sht=dat.reg[seq(1,n,ceiling(n/30)),]
+dat.sht = melt(dat.sht, measure.vars = list(c("X1","X2"),c("Y1","Y2")), variable.name = "obs", value.name = c("time","cd4"))
+# Re-order data.table by time within id.
+setorder(dat.sht,id,time)
+p <- ggplot(data = dat.sht, aes(x = time, y = cd4, group = id,color=slope))
+p + geom_line()
+
+```
+Note that the true variation among the subjects in average changes with time is confounded by estimation error (error in estimating the true individual curves from limited data).  However, it does give a sense that 1) at baseline, starting CD4 counts are almost all below the lower level of health (500), with many below the cut-off for having AIDS (200); and 2) from the plot on the distribution of slopes above and from the plot, one sees, on average, more lines going up (possibly treatment increasing CD4 counts) than going down (treatment not preventing course of diseease).  
+
+This plot also anticipates when we talk about methods for handling repeated, longitudinal measures on a subject.  For one, allowing for subjects to have different random intercepts and slopes also means that the observations within a subject will be correlated (we study this in more technical detail later).  We will study methods that explicitly allow random coefficients by individual (mixed models) and also account for the correlation these models imply (mixed models; generalized estimating equations; GEE).
+
+## Semi-parametric estimation (smooths) of response with time
+One coud fit more flexible parametric models than just simply linear ones (e.g., quadratic, cubic, ...) and display the resulting fits as above (though, now we would have to plot over a grid, not just 2 points).  
+
+
+In this section, we discuss methods that fit the desired pattern over time, without invoking specific functional (parametric) forms.  Sometimes, a subset of these methods are called "smooths"  as they smooth out the more volative ups and downs in the data.  If there is a lot of noise (say error) in the measurements, then smothing out these rough spots can elucidate the more meaningful patterns.  Smoothing can be thought of as a local averaging, so that the curve at a particular point, $X=t$ is estimated as a (weighted) average of the outcomes with $X$ close to $t$ (the weighting is used to give points closer to $t$ more influence in estimating the mean).  Specifically, the estimate of $m(t)\equiv E(Y \mid T=t)$ is:
+\[
+\hat{m}(t) = \frac{\sum_{i=1}^n Y_i w \Big( \frac{T_i-t}{h}\Big)}{\sum_{i=1}^n w \Big( \frac{T_i-t}{h}\Big)} 
+\]
+or the weighted average of the $Y_i$'s "close" to $t$ where the weight function, $w \Big( \frac{T_i-t}{h}\Big)$ and the bandwidth $h$ determine how much weight by how close to $t$.  
+
+The smoothing is often done on different scales, such as the logit scale (for binary outcomes).  Below we do it on the linear scale using the smoothing commands.
+```{r smooth0, warning=FALSE, message=FALSE}
+ 
+p <- ggplot(data = dat, aes(x = etime, y = cd4))
+
+p+geom_smooth(method="loess", size=1, formula = y ~ x, span = 0.1,color="red") +geom_smooth(method="loess", size=1, formula = y ~ x, span = 0.2,color="blue")+geom_smooth(method="loess", size=1, formula = y ~ x, span = 0.5,color="black") 
+
+
+```
+The above plot shows the estimated (smooth) average CD4 versus time for 3 different bandwidths, from very unsmooth (red) to very smooth (black).  There are well-established methods for choosing the "optimal" bandwidth (size of window for averaging);  cross-validation is the most straightforward to understand.  It works by breaking up the data into equal-sized parts (say $V=10$ partitions).  For each of the 10 samples, it removes the sample (called a validation sample), fits different smooths over a set of user-specified bandwidths (9/10 of the data called a training sample), and then examines the performance of the resulting estimated curve to predict the CD4 counts on the validation sample.  This is repeated for each of the 10 sets of data and the performance, such as the mean-squared error, is estimated over all the data.  In this manner, one gets an unbiased estimate of the performance and so one simply chooses the bandwidth to use on all the data, the one that performs the best on average across the 10 configurations of training and corresponding validation samples. Other methods, that can be thought of approximations of this empirical estimate, are also used (i.e., AIC, BIC,...).
+
+```{r smooth2, warning=FALSE, message=FALSE}
+p <- ggplot(data = subset(dat.sht), aes(x = time, y = cd4, group = id,color=slope))
+
+p+geom_smooth(method="loess", size=1, formula = y ~ x, span = 1)
+```
+
+There are many warnings, which have to do with some individuals having too few observations to perform a semi-parametric smooth.  However, the result is an effective display of the variability of smooth patterns among the subjects.  They include subjects that decline in CD4, those that increase, and those that increase but asymptote at a health CD4  ($ > 500$).  
+
+# Group individuals by patterns over time.
+One simple way to group the subjects (id's) by pattern over time is  clustering.  There are many methods, some of more nonparametric  (like clustering), some of them model-based.  In this case, we use nonparametric clustering.  First, we have to make a "wide" data set so that we have the same (pseudo)measurements at the same time points for all subjects. Since our data is so messy, we have to interpolate from the
+observed data into a new data set that has fixed grid points, so that the data looks like balanced, nice data.
+To do so, we first make a data set of id and times evenly spaced from 0 to 1500
+```{r smooth1, warning=FALSE, message=FALSE}
+# Make a data set with fixed number of observations per id at # regularly spaced time intervals so one can interpolate at fixed set of points in time.
+## First get the min and max by id
+setkey(dat2,id)
+
+time.ranges <- dat2[,list(mintime=min(etime,na.rm=T),maxtime=max(etime,na.rm=T)),by='id']
+
+par(mfrow=c(1,2))
+
+ggplot(time.ranges, aes(x=mintime)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Min Time") +xlab("days") 
+
+ggplot(time.ranges, aes(x=maxtime)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Max Time") +xlab("days") 
+
+```
+
+As one can see, most subjects have beginning times of monitoring \> 50 days and last time \< 1200 days. Thus, we will only examine subjects that have measurements that have start time before 50 days and end time after 1200 days.
+
+
+```{r cluster1, warning=FALSE, message=FALSE}
+plotids = time.ranges[mintime < 50 & maxtime > 1200,]
+## Make a function that returns matrix of new times, imputed values, and associated id's
+apprx=function(idx,dat,atxs) {
+  tmp=dat[dat$id==idx,]
+  aprx=approx(x=tmp$etime, y = tmp$cd4, atxs, method="linear",rule=2)
+  return(data.table(id=idx,etime=aprx[[1]],cd4=aprx[[2]]))
+}
+tmes = seq(50,1200,15)
+ids = plotids$id
+nids = length(ids)
+out=NULL
+out=apprx(1,dat,atxs=tmes)
+for(i in 2:nids) {
+#  cat(" i =",i,"\n")
+  out=rbind(out,apprx(ids[i],dat,atxs=tmes))
+}
+## Make wide format
+out.wide = dcast(out, id ~ etime, value.var = "cd4")
+head(out.wide)[,c(1:3,76:78)]
+```
+As one can see, we now have a (pseudo) clean data set, with the different
+columns representing different imputed CD4 values, with the name of the column being the time in days the imputed value represents, e.g., $E(Y_i|T_i=t)$, for each individual $i$, and $t=50,65,\ldots,1175,1190$.
+We now simply cluster the individuals by these measurements.
+```{r cluster2, warning=FALSE, message=FALSE}
+library(cluster)
+## get rid of id column
+out.sht=out.wide[,-1]
+rownames(out.sht)=out.wide$id
+### First we look at the number of groupings versus a measure of how 
+### well the data is clustered (something called the average silhouette)
+avesilh = NULL
+for(k in 2:8) {
+pam.1<-pam(out.sht,k=k,diss=F)
+avesilh=c(avesilh,pam.1$silinfo$avg.width)
+}
+## Though this suggests that the best number of clusters in k=2,..,8 is 2, we will use 4 to make it more interesting in this case
+range(out.sht)
+pam.1<-pam(out.sht,k=4,diss=F)
+## First, we look at the number of clusters in each group
+table(pam.1$clustering)
+```
+Now, we do a multivariate, principle components analysis (PCA) plot that look empirically at how well the clusters are easily separated.
+```{r cluster3, warning=FALSE, message=FALSE}
+plot(pam.1,which.plots = 1,main="PCA Plot for PAM fit to imputed CD4 vs. time data",labels=4)
+```
+It appears that one can distinguish quite well among these 4 clusters with the imputed data. The main thing we need is the a data.table with id and cluster and we derive that now.  We use the fact that when R has functions that produce one summary statistic per row of data.table, then typically it labels the row-specific estimates with the row name.  Since we made the id the rowname in out.sht, we can use this to make a matching id for the clustering output.  We change it to a numeric variable because that is how it's stored back in the original data (dat).
+```{r cluster4, warning=FALSE, message=FALSE}
+cluster.res=data.table(id=as.numeric(names(pam.1$clustering)),cluster=pam.1$clustering)
+# Merge back with original data
+clust.merge = merge(dat,cluster.res,by=1,all=T)
+```
+After all that, one gets a data.table (clust.merge) that is simply the original data merged with cluster assignment.  Now, we can simply use the syntax for generating smooths to get 
+
+```{r cluster5, warning=FALSE, message=FALSE}
+p <- ggplot(data = subset(clust.merge), aes(x = etime, y = cd4, group = cluster))
+
+p+geom_smooth(method="loess", size=1, formula = y ~ x, span = 1)
+
+```
+The 4 clusters differ by combinations of initial average value, magnitude of initial increase in average CD4, form and timing of the plateau. 
+
+# Longitudinal relationship of two explanatory variables
+## Baseline variables
+We now add other explanatory variables into mix (beyond time), in this case viral load.  We first ask, does the viral load (VL) at baseline impact the pattern of average CD4 over time. In general, we are looking how a value of one variable at baseline impacts the trend of CD4 over time.   To do so, we have to: 
+
+* pull out the VL at time 0 for each subject.
+* create a new categorical variable for the VL
+* merge that new variable back into the original data set
+* smooth CD4 by time within groups defined by categorical VL
+
+Below, we perform those operations in order.
+```{r YvsX1, warning=FALSE, message=FALSE}
+catvl = dat$vl500
+catvl<-cut(dat$vl500, c(0,70000,220000,max(dat$vl500,na.rm=T)))
+dat.new=data.table(dat,catvl)
+dat.new=dat.new[etime==0,c("id","catvl")]
+dat.new=merge(dat.new,dat,by="id",all=T)
+#dat.new=dat.new[,c(id,catvl)]
+p <- ggplot(data = dat.new, aes(x = etime, y = cd4, group = catvl,color=catvl))
+
+p+geom_smooth(method="loess", size=1, formula = y ~ x, span = 1)
+```
+One can see that those within the lowest VL group (0 to 70000) start with higher CD4 and end with higher CD4 (on average).  However, other than that, there is not a great distinction among the plots. Many reasons are possible: 
+* the true baseline VL is not a great predictor of patterns  of CD4 over time,
+* the categories of VL made do not capture the impact of baseline VL,
+* The VL measurement in the data is very noisy and thus not a good indication of the true VL,
+* others and combinations of above.
+
+Another thing to notice is that those that do not have a baseline measurement (the NA's) start with lower CD4's on average (smoothed from observations that are close to 0) and they have generally lower CD4 counts over time. 
+
+
+## Showing longitudinal associations
+The above examples emphasize changes of an outcome over time, possibly stratified by another variable (VL in our case).  Now, we focus on relationships that are often the motivation for designing longitudinal studies, that is the investigation of how changes in one factor are related to changes in an outcome.  The time ordering inherent in longitudinal data allows us to examine whether assocations possible seen in cross-sectional data are verified when the outcome and covariate process are watched in time.  A good metaphor is the contrast of trying to reconstruct what caused an event from a photo (cross-sectional data) versus a movie (longitudinal data).  For example, a photo might show a man lying lifeless on the ground, the butler holding a hammer standing over the apparent victim.  The corresponding movie would have shown the person dropping to the floor from a heart attack and the butler running into to investigate carrying the hammer he was using to hang pictures in the library.  In similar ways, cross-sectional data can provide a distorted version of reality, whereas longitudinal data, if handle correctly, can use the time-ordering to verify that the putative cause proceeds (on average) the effect.  
+
+We examine the relationship of changes in VL and synchronous changes in CD4 count.  But first, let's look at the distribution of viral load.  
+
+```{r YvxX2, warning=FALSE, message=FALSE}
+ggplot(dat, aes(x=vl500)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Viral Load")  
+
+```
+As one can see, the distribution is dominated by values at the limit of detection (LOD - near 0).  It's hard to show the entire distribution in one plot because to accomodate the number of observations at the limit of detection,  because  both the x and y-axes needs to have big ranges (combination of many observations at LOD and a few with huge values), so that the probably distrubtion of values greater than the LOD looks like a flat line.  Thus, we re-do the histogram but only among those observations with values \> LOD and $ < 10^6$.
+```{r YvsX3, warning=FALSE, message=FALSE}
+ggplot(data=subset(dat,vl500 > 500 & vl500 < 10000), aes(x=vl500)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Viral Load")
+```
+Now, one gets a better image of the distribution of the VL within those observations $>$ LOD. This is also sometimes handled by looking at a transformation of the variable.  If the variable has no values $\le 0$, then a log-transformation can work.
+
+```{r YvsX4, warning=FALSE, message=FALSE}
+ggplot(dat, aes(x=log10(vl500))) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +ggtitle("Viral Load")
+```
+
+One can now see the entire distribution of the values much more easily.  There is an large  number of observations at 500 (the LOD), then fairly flat distribution of VL up to the maximal values. 
+
+We now turn to data-manipulation to make new VL and CD4 variables that represent the change in values from the previous time.  Call $Y^*_{i,j} = Y_{i,j}-Y_{i,j-1}$ the change in CD4 from $j-1$ to $j$ and likewise, $X^*_{i,j} = X_{i,j}-X_{i,j-1}$  the corresponding change in VL.  We will do so by a little trick, one that duplicates the data.table dat twice (dat1 and dat2), after they are orderd by time within id.  Then, subtracting the cd4 column of dat2 from that in  dat1 one gets the change in cd4 between columns.  The only exception is the first measurement for each id, since no change variable is identifiable at the first measurement.  We can handle that by simply making any observation with the id of dat1 is not equal to the corresponnding id of the same row in dat2 a NA.
+
+
+```{r YvsX5, warning=FALSE, message=FALSE}
+dat=data.table(dat)
+dat=dat[order(id,etime)]
+dat1=dat[-1,]
+dat2=dat[-dim(dat)[1],]
+Ystar=dat1[,"cd4"]-dat2[,"cd4"]
+Xstar=dat1[,"vl500"]-dat2[,"vl500"]
+Ystar[dat1$id != dat2$id]=Xstar[dat1$id != dat2$id]=NA
+dat1=data.table(dat1,Ystar=Ystar,Xstar=Xstar)
+```
+
+Now we can plot the association of these two variables and do a smooth through the scatterplot.
+
+```{r YvsX6, warning=FALSE, message=FALSE}
+p <- ggplot(data = dat1, aes(x = Xstar.vl500, y = Ystar.cd4))
+p + geom_point()+geom_smooth(method="loess", size=1, formula = y ~ x, span = 0.55)
+
+```
+This is empirical examinaton of the LONGITUDINAL associationn of CD4 count and viral load, but looking at how they go up and down togther over time within an individual.  In the range of VL change of -100000 to -50000 one sees a positive change of CD4 of about 200.  At no VL change, CD4 also appears not to channge. Conversely when there is a positive change in VL, one gets a negative change in CD4 (an increase of 100000 in VL is associated with about a 200 decrease in CD4).  This is the graphical equivalent of a longitudinal analysis of the association of CD4 with VL.  We can compare it to a cross-sectional analysis, but simply looking at the relationship of CD4 with VL ignoring the individuals measured (i.e., no "change" variable).
+```{r YvsX7, warning=FALSE, message=FALSE}
+p <- ggplot(data = dat, aes(x = vl500, y = cd4))
+p + geom_point()+geom_smooth(method="loess", size=1, formula = y ~ x, span = 0.55)+xlim(0,200000)
+```
+Note, on the smooth there is a change of roughly 300 point reduction CD4 count from a VL of 0 to that of 100000.  This is greater than we looked within subjects at change.  We will explore in future chapters how this can arise and how we can use proper modeling to get at the longitudinal impact.
+
+# Supplement: Chapter 2 in Weiss
+
