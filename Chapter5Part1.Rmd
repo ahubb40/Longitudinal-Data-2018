@@ -1,0 +1,393 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Linear Models with repeated measures'
+author: Alan Hubbard
+date: Oct 2, 2018
+output: 
+  beamer_presentation:
+    keep_tex: TRUE
+#output: pdf_document
+#output: 
+#  slidy_presentation:
+header-includes:
+  - \usepackage{pdfpages}
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+library(dplyr)
+library(MASS)
+library(tidyverse)
+library(cowplot)
+library(purrr)
+library(tidyr)
+library(multcomp)
+```
+
+# Introduction
+- In last section, we concentrated on ways to reduce repeated, longitudinal outcome data into a single summary measure (e.g., count of binary repeated measures) so that standard regression procedures could be used.
+- However, in this section, we explore how linear regression can accommodate repeated measures.
+- This will lead ultimately to describing popular repeated measures procedures, like Mixed Models and Generalized Estimating Equations (GEE).
+- First, we examine data from an observational study on the size of kids mouths as they grew.
+
+---
+
+```{r readin, message=F, warning=F}
+dat <- read_csv("dental.csv")
+tbl_df(dat)
+
+```
+# Data Notation
+- child = i (id)
+- $age  = X_{ij1}$
+- $gender = X_{ij2}$: 1 is male, 0 female
+- measure of teeth $distance = Y_{ij}$
+
+
+# Plot the data
+
+```{r plot1, message=F,echo=F}
+p1 <- ggplot(subset(dat,gender==0), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Girls")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+p2 <- ggplot(subset(dat,gender==1), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Boys")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+plot_grid(p1,p2)
+
+```
+
+# Plots show:
+1. variation among outcome at start (age 8 years),
+2. increase over time, but not perfectly linear for subjects,
+3. maybe one measurement error (boy that drops from age 12 to 14).
+
+# Look at basic summaries with dplyr
+
+```{r sum1, message=F, warning=F}
+
+# get number of obs per person and mean
+sum_dat=group_by(dat,child) %>% summarise(mean=mean(distance),n=n(),gender=first(gender))
+table(sum_dat$gender)
+```
+
+# Linear model of distance by age and gender
+
+- $Y_{ij}$ distance of the jth measurement on the ith child,
+- $X_{ij1}$ is the age of ith child, jth measurement,
+- $X_{ij2}$ is the gender of ith child, jth measurement (1 is male, 0 is female) - same for all $j =1,...,4$  measurements.
+
+$$ Y_{ij} = \beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}+e_{ij}, E(e_{ij}|X_{ij})=0 $$
+
+# Oridinary Least Squares
+- The name is based on the objective function, that is:
+
+$$ \hat{\beta} \equiv argmin_{\beta} \sum_{i=1}^n \sum_{j=1}^4(Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]) ^2 $$
+
+- So, it minimizes the mean-squared error, or the squared residuals $r_{ij} \equiv 
+Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]$
+
+- Can be motivated in two ways
+    + Maximum likelihood estimation by assuming, for example, $e_{ij} \sim N(0,\sigma_e)$
+    + As the procedures that minimizes the squared residuals, regardless of distribution of $e_{ij}$
+    
+# MLE Justification
+- Assume independent and identically distributed $e_{ij} \sim N(0,\sigma_e)$ (so for now, observations are independent regardless if they are made on same child).
+- The likelihood is defined as simply the probability of the observed data.  In this case, we can define the likelihood of one observation as:
+$P(Y_{ij}\mid X_{ij1}, X_{ij2})P(X_{ij1},X_{ij2})$  
+- However, we can ignore the 2nd term (our parameters of interest are not a function of the distribution of $P(X_{ij1},X_{ij2})$).
+
+# MLE , cont.
+- The likelihood of all the observations is (if they are all independent) the probability of each observation multiplied together (e.g., $P(A \& B)=P(A)P(B)$ if independent).
+$$ = P(Y_{11} \mid X_{111},X_{112}) P(Y_{12} \mid X_{121},X_{122}) $$
+$$ \cdots P(Y_{m3} \mid X_{m31},X_{m32}) P(Y_{m4} \mid X_{m41},X_{m42})$$
+
+$$ = \prod_{i=1}^m \prod_{j=1}^4 P(Y_{ij}\mid X_{ij1}, X_{ij2})$$
+
+- If we assume a normal distribution for the $e_{ij}$, then the distribution of $Y_{ij} \mid X_{ij1}, X_{ij2}$ is also normal, since the rest of the linear equation is fixed when the X's are fixed.
+ 
+# Distribution of $Y|X$ in this model is distribution of $e$. 
+- Note that $e_{ij} = Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]$, so that
+$$P(Y_{ij} \mid X_{ij1}, X_{ij2}) = P(e_{ij} \mid X_{ij1}, X_{ij2}) $$
+$$= P(Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]) $$
+$$ = \phi \Big(\frac{Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]}{\sigma_e}\Big)$$,
+where $\phi(x)$ represents the standard normal density $=\frac{exp(x^2)}{\sqrt{2 \pi} }$. 
+
+# Likelihood function
+- Thus,for all the data the likelihood (as a function of $\beta$) is
+$$ L(\beta \mid data) = \prod_{i=1}^m \prod_{j=1}^4  \phi \Big(\frac{Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]}{\sigma_e}\Big)$$
+
+- For several reasons, the log of this function is maximized (the maximum of the function, w.r.t. $\beta$ or its log is the same)
+
+$$ l(\beta \mid data) = \sum_{i=1}^m \sum_{j=1}^4 log \Big[ \phi \Big(\frac{Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]}{\sigma_e}\Big) \Big] $$
+
+- taking the log of the $\phi$ function is
+$$ log \Bigg( \frac{exp \Big(- \frac{\{Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + 
+\beta_3 X_{ij1}X_{ij2}] \}^2}{2\sigma^2_e}\Big)}{\sqrt{2 \pi \sigma^2_e} } \Bigg) $$
+$$ = -\Big(  \frac{ \{Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]\}^2}{2 \sigma^2_e}\Big) - 1/2 * log(2 \pi \sigma^2_e)$$
+
+# Maximizing likelihood
+- So, maximizing the log-likelihood is the same as minimizing the 
+$$MSE(\beta) \equiv \frac{1}{N} \sum_{i=1}^n \sum_{j=1}^4(Y_{ij}-[\beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2}]) ^2 $$.
+
+- Thus one can define OLS as 
+
+$$ \hat{\beta} \equiv argmin_{\beta} MSE(\beta) $$
+
+# Properties of MLE
+- If you believe a particular parametric model for the data-generating distn, then: MLE’s have **invariance property**: 
+    + if $\hat{\beta}_n$ is the MLE, then any function of them is the MLE esitmate, $h(\hat{\beta}_n)$ is the MLE of $h(\beta_{true})$.
+    + e.g., if $\hat{\beta}_n$ is MLE, then $e^{\hat{\beta}_n}$ is also an MLE.
+- **Asymptotically unbiased** (consistent), that is for any $$\epsilon > 0, lim_{n \rightarrow \infty} P(|\hat{\beta}_n-\beta_{true}|>\epsilon) \rightarrow 0. $$
+- **Asymptotically linear**: $\hat{\beta}_n \approx \beta_{true}$ plus i.i.d. terms with mean 0. 
+- **Asymptotically efficient**: if $\tilde{\beta_n}$ is a competing estimator in same model, then
+$$lim_{n \rightarrow \infty} \Big[ \frac{var(\hat{\beta_n})}{var(\tilde{\beta_n})} \Big] \le 1 $$
+
+# Motivating OLS as estimating equation
+- OLS also can be motivated without knowing the likelihood of the data (e.g., without asserting that $e \sim N(0,\sigma_e)$).
+- It turns out that the estimating equation is consistent for $\beta$ regardless of the distribution of $e \mid X_{ij}$. 
+- In general, an estimating equation results in a consistent estimator of $\beta_{true}$ if $E_{\beta_{true}}g(O_i,\beta_{true})=0$, where $g(,)$ is an estimating equation, and $O_i$ is the data on one statistical unit, so in our case, $O_i=(Y_{ij},\vec{X}_{ij},j=1,...,4)$.  
+- These leads to an estimator by solving $\frac{1}{m} \sum_{i = 1}^m g(O_i,\beta) = 0$.
+
+
+# OLS as Solution to minimizing MSE
+- One has a function that one is trying to minimize w.r.t. $\beta$, i.e., 
+$argmin_{\beta} MSE(\beta)$
+- Let's take a simple linear model for now with one predictor: $Y_{ij} = \beta_0+\beta_1 X_{ij}+e$, so minimizing the MSE is same as minimizing:
+- Minimizing the function specifically in this case, is minimizing 
+$$MSE(\beta) = \sum_{i=1}^n \sum_{j=1}^4(Y_{ij}-[\beta_0 +\beta_1 X_{ij}]) ^2 $$.
+
+# Minimizing function
+- How does one minimize functions?
+    + Try an exhaustive grid over all possible values of the parameters  $\beta=(\beta_0,\beta_1)$ and find the combo that has smalles $MSE(\beta)$
+    + Find the solution analytically using calculus.
+- One can solve a set of two differential equations in this case, so:
+$$ \frac{\partial MSE(\beta)}{\partial \beta_0} = 0 $$ and
+$$ \frac{\partial MSE(\beta)}{\partial \beta_1} = 0 $$
+- Solve for $(\beta_0, \beta_1)$.
+- Show on board.
+- In this case, one gets the following general solution (in matrix form):
+$$\hat{\vec{\beta_n}} = \boldsymbol{(X X^T) }^{-1} \boldsymbol{X}^T \vec{Y}$$
+
+# Is this a consistent estimator?
+- We now from theory, if it's the MLE, it is a consistent estimator (see above).
+- However, is it more generally consistent than that?
+- Just have to plug and chug to see what is the expected value of this estimator, $E(\hat{\beta_n})$ and whether it is equal to the true $\beta_{true}$.  
+- This one is "easy":
+$$E(\hat{\beta_n}\mid \boldsymbol{X})=E\{ \boldsymbol{(X X^T) }^{-1} \boldsymbol{X}^T \vec{Y} \mid \boldsymbol{X} \} $$
+$$=
+\boldsymbol{(X X^T) }^{-1} \boldsymbol{X}^T E(\vec{Y} \mid \boldsymbol{X}) $$
+$$ = \boldsymbol{(X X^T) }^{-1} \boldsymbol{X}^T  \boldsymbol{X} \vec{\beta}_{true} = \vec{\beta}_{true}$$
+
+# What about impact of repeated measures (dependent data)?
+- The dependence among observations on same subject does not impact the "proof"
+    + This is because expectation of sums is sum of expectations, e.g., $E(\sum_{i=1}^m \sum_{j=1}^{n_i} Y_{ij}) = \sum_{i=1}^m \sum_{j=1}^{n_i} E(Y_{ij})$
+    + Note, this is NOT generally true for variances of sum - that the variance of sum is only equal to sum of variances if the random variables are independent.
+
+- Thus, it looks like ignoring the dependence does not necessarily cause bias in estimation of the coefficients (generally true, but gets complicated in more complicated setting with unequal numbers of measurements per unit, and if the linear model is misspecified).
+
+# Variance of coefficient estimates from OLS fit ($var(\hat{\beta}_n)$).
+- Note that $\hat{\beta}_n = (\hat{\beta}_{0,n}, \hat{\beta}_{1,n})$ is a vector the variance of a vector implies the variance-covariance matrix, or a matrix with the variance of all parameter estimates and all pairwise covariances.  
+- So, when we say we want the $var(\hat{\beta}_n)$, which we sometimes represent as $V_{\hat{\beta}_n}$,it means the estimate of each component of the following in our simple linear model case ($Y_{ij} = \beta_0+\beta_1 X_{ij}+e$), so
+$$
+V_{\hat{\beta}_n} = 
+\begin{bmatrix}
+    var(\hat{\beta}_{0,n})        & cov (\hat{\beta}_{0,n},\hat{\beta}_{1,n}) \\
+    cov (\hat{\beta}_{0,n},\hat{\beta}_{1,n})   & var(\hat{\beta}_{1,n})
+\end{bmatrix}
+$$
+- We want to derive an estimate of this (since we never know it) so
+$$
+\hat{V}_{\hat{\beta}_n} = 
+\begin{bmatrix}
+    \hat{var}(\hat{\beta}_{0,n})        & \hat{cov} (\hat{\beta}_{0,n},\hat{\beta}_{1,n}) \\
+    \hat{cov} (\hat{\beta}_{0,n},\hat{\beta}_{1,n})   & \hat{var}(\hat{\beta}_{1,n})
+\end{bmatrix}
+$$
+
+# Standard errors
+- Note that the standard errors reported in regression outputs are based upon this estimated matrix, e.g., $SE(\hat{\beta}_{1,n}) = \sqrt{\hat{var}(\hat{\beta}_{1,n})}$.
+- If we ever want to report an estimated parameter that involves more than one coefficient estimate, then we also need the covariance terms (though we can have procedures that automate this process).
+
+# Review some rules of expectation and variance for random variables and vectors.
+
+- Expectation of sum is sum of expectations
+     $$E(\sum_{i=1}^m \sum_{j=1}^{n_i} Y_{ij}) = \sum_{i=1}^m \sum_{j=1}^{n_i} E(Y_{ij})$$
+- Expectation of constant times random variable (vector) is constant times expectation of random variable (vector)
+    $$ E(AY) = AE(Y) $$
+    $$ E(\vec{A}^T \vec{Y}) = A^T E(\vec{Y}) $$
+- Variance of constant times random variable is constant squared times variance of random variable
+$$ var(AY) = A^2 var(Y)$$
+$$ var(\vec{A}^T \vec{Y}) = \vec{A}^T V_{\vec{Y}} \vec{A}$$
+
+# Using rules to get $var(\hat{\beta}_n)$
+
+- Get $$var(\hat{\beta_n}\mid \boldsymbol{X})=var\{ \boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T \vec{Y} \mid \boldsymbol{X} \} $$.
+- Not that this is same situation as the matrix version of the variance of a constant times a random variable
+- In this case, matrix of constants ($\boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T$) times a random vector ($\vec{Y}$).
+- Using the rule above, this means that:
+$$var\{ \boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T \vec{Y} \mid \boldsymbol{X} \} = \boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T V_{\vec{Y}}[\boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T]^T$$
+- Using rules of matrix transformation, one gets:
+$$ var(\hat{\beta_n}\mid \boldsymbol{X})= \boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T V_{\vec{Y}} \boldsymbol{X} \boldsymbol{(X^T X ) }^{-1} $$
+- The term "sandwich estimator" of the variance comes from this form 
+ where the sandwich filling is the variance-covariance matrix of $\vec{Y} \mid \boldsymbol{X}$, or $V_{\vec{Y}}$ and the bread is the $\boldsymbol{(X^T X ) }^{-1} \boldsymbol{X}^T$.
+
+# Estimating $var(\hat{\beta_n}\mid \boldsymbol{X})$ 
+
+- All the matrices $\boldsymbol{X}$ are known (we are conditioning on them)
+- The only unknown matrix is $V_{\vec{Y}}$, or the variance covariance of the outcomes.
+- Thus, we have to estimate it in order to fill in the unknown components of it.
+- This is where assumptions about the "form" of the variance-covariance (VC) matrix, that is assumptions of how the observations are potentially dependent, have an impact.
+
+# a 
+\includegraphics[page=2,width=5in]{Chapter5AddSlides1.pdf}
+
+# b
+\includegraphics[page=3,width=5in]{Chapter5AddSlides1.pdf}
+
+# c
+\includegraphics[page=4,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# d
+\includegraphics[page=5,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# e
+\includegraphics[page=6,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# f
+\includegraphics[page=7,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# g
+\includegraphics[page=8,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# h
+\includegraphics[page=9,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# i
+\includegraphics[page=10,width=4.5in]{Chapter5AddSlides1.pdf}
+
+# j
+\includegraphics[page=11,width=5.5in]{Chapter5AddSlides1.pdf}
+
+# k
+\includegraphics[page=12,width=5.5in]{Chapter5AddSlides1.pdf}
+
+# l
+\includegraphics[page=13,width=5.5in]{Chapter5AddSlides1.pdf}
+    
+# m
+\includegraphics[page=14,width=7in]{Chapter5AddSlides1.pdf}
+
+# n
+\includegraphics[page=15,width=5.5in]{Chapter5AddSlides1.pdf}
+
+# Estimate linear model for dental data
+- Again, the model we wanted to estimate is:
+
+$$ E(Y_{ij} \mid \vec{X}_{ij}) = \beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2} $$
+
+```{r echo=FALSE}
+# makes the font size adjustable
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+```
+
+# Use simple OLS
+
+```{r dentaldata, mysize=TRUE, size='\\tiny', message=F,warning=F}
+# First, make interaction term
+library(RCurl)
+dat = dat %>% mutate(inter=gender*age)
+ols_fit = lm(distance ~ gender+age+inter, data=dat)
+summary(ols_fit)
+```
+
+# Output to reporting
+
+- Because of the interaction term, one can not interpret the individual coefficients as easily as a model with only main terms.
+- The first thing is to decide what is a good measure of association.
+- First lets take age:
+    + must choose a change of age: lets take 6 years
+    + For now, we will Assume that gender is set to some fixed value, $g$.
+
+$$ E(Y_{ij} \mid X_{ij1}=age+6,X_{ij2}=g) -  E(Y_{ij} \mid X_{ij1}=age,X_{ij2}=g) $$
+
+$$ = \beta_0 +\beta_1 (age+6)+\beta_2 g + \beta_3 (age+6)*g $$
+
+$$ - [\beta_0 +\beta_1 age+\beta_2 g + \beta_3 age*g] $$
+
+$$ = 6*\beta_1 + 6*g*\beta_3$$
+
+# Getting estimates of linear combination of coefficients
+- The previous slide shows that, for females:
+
+$$ E(Y_{ij} \mid X_{ij1}=age+6,X_{ij2}=1) -  E(Y_{ij} \mid X_{ij1}=age,X_{ij2}=1) $$
+$$ =  6*\beta_1 + 6*\beta_3$$
+- Thus, we want to get an estimate of (and standard error for): $6*\hat{\beta}_1 + 6*\hat{\beta}_3$.
+
+- We've already done this based on user-written function, but this time we'll use an exsiting function in the **multcomp** package.
+
+# Get estimates and inference for linear combination of coefficients using the "naive" inference returned by the OLS procedure.
+```{r assocboys,mysize=TRUE, size='\\tiny', message=F,warning=F}
+## Note how the algebra is entered into function
+### For boys
+lin.boys=glht(ols_fit, linfct = c("6*age +6*inter=0"))
+#summary(lin.boys)
+confint(lin.boys)  
+```
+
+# Repeat for girls
+In this case, 
+$$ E(Y_{ij} \mid X_{ij1}=age+6,X_{ij2}=0) -  E(Y_{ij} \mid X_{ij1}=age,X_{ij2}=0) $$
+$$ =  6*\beta_1$$
+
+```{r assocgirls,mysize=TRUE, size='\\tiny', message=F,warning=F}
+
+lin.girls=glht(ols_fit, linfct = c("6*age=0"))
+#summary(lin.girls)
+confint(lin.girls)  
+```
+
+The results suggest that the mean change in the distance for boys is 4.76 (95\% 3.20-6.21) and that for girls is 2.88 (95\% 1.07-4.69).
+
+
+
+# Robust estimation of SE's
+
+- Here, we are beginning the meat of the course, getting inference that can account for the potential repeated measures structure.
+
+- We will explore many methods that can do this with varying numbers of assumptions
+
+- Here we start with some of the methods are meant to give **nonparametric inference** for any general linear model estimators.  
+
+
+# Inference for sandwich estimator
+
+```{r robust.option, mysize=TRUE, size='\\tiny', message=F,warning=F}
+# Read in user written function using lmtest and 
+# sandwich packages that return both information 
+# on coefficients and estimates of linear
+# combination of coefficients using
+# clustered/robust variance estimates
+source("clx.R")
+source("clx_lincom.R")
+
+clx(ols_fit, 1, dat$child)
+# Robust estimate for change in mean
+# for 6 year increase in age for
+# boys
+clx.lincom(ols_fit, 1,dat$child, c(0,0,6,6))
+
+```
+
+# Comparison of results
+- If one looks at the age coefficient, one can see that the robust SE is much smaller than the naive one returned by standard OLS: 0.065 vs 0.152.  
+- We can also compare the results of the estimate of  
+$$ =  6*\beta_1 + 6*\beta_3$$
+and we see the CI based upon the robust estimates that account for dependence is 3.511-5.911 versus 3.205-6.207, so for this parameter, the CI gets bigger when the SE is estimated correctly.
+
+# Conclusions
+- One can motivate standard ordinary least squares estimation by either maximum likelihood estimation or estimating equation.
+- Ignoring the repeated measures structures does not affect the biasedness of the OLS estimates of the coefficients.
+- However, the standard errors returned assuming independence are biased.
+- We can fix these by procedures that assume nothing about the covariance of observations within the same unit.

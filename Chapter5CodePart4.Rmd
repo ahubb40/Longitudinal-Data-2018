@@ -1,0 +1,151 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'And More GEE'
+author: Alan Hubbard
+date: Oct 23, 2018
+output: 
+  beamer_presentation:
+    slide_level: 2  
+header-includes:
+  - \usepackage{pdfpages}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r global_options, include=FALSE}
+# This bit of code lets you set the font size
+# in heading of code junk when writing to beamer.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+# Libraries
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(gee)
+library(cowplot)
+library(data.table)
+```
+
+
+## Intro
+- The Six Cities Study of Air Pollution and Health was a longitudinal study designed to characterize
+lung growth as measured by changes in pulmonary function in children and adolescents.
+- A cohort of 13,379 children born on or after 1967 wasn enrolled in six communities across the U.S.: Watertown (Massachusetts), Kingston and Harriman
+(Tennessee), a section of St. Louis (Missouri), Steubenville (Ohio), Portage (Wisconsin), and
+Topeka (Kansas). 
+
+## Intro, cont.
+- Most children were enrolled in the first or second grade (between the ages of
+six and seven) and measurements of study participants were obtained annually until graduation
+from high school or loss to follow-up. 
+- At each annual examination, spirometry, the measurement of pulmonary function, was performed and a respiratory health questionnaire was completed by
+a parent or guardian. 
+
+- Reference: Dockery, D.W., Berkey, C.S., Ware, J.H., Speizer, F.E. and Ferris, B.G. (1983).
+Distribution of FVC and FEV1 in children 6 to 11 years old. American Review of Respiratory
+Disease, 128, 405-412.
+
+## Specific data for example
+- The data consist of all measurements of FEV1, height and age obtained from a randomly selected
+subset of the female participants living in Topeka, Kansas. 
+- The random sample consists of 299
+girls, with a minimum of one and a maximum of twelve observations over time.
+- Variables include time-dependent age (yrs), height (meters), and fev1 (forced expired volume in first second after spirometry in ml).
+- Data already has been processed somewhat to have baseline age and height as covariates.
+
+
+## Read in data
+```{r prelim1, size="tiny"}
+dat1=read_csv("fev.csv")
+tbl_df(dat1)
+```
+
+## Distribution of FEV1 by Age
+```{r exp1, size="tiny", echo=F}
+# Distribution of lnfev 
+# Make plots of randomly selected subjects of lnfev versus age and height
+dat1 <- dat1 %>% mutate(ageyr = trunc(age))
+
+ggplot(dat1,aes(x=as.factor(ageyr),y=lnfev))+geom_boxplot() 
+
+```
+
+## Distribution of FEV1 by Height in Feet
+```{r exp2, size="tiny", echo=F}
+# Distribution of lnfev 
+# Make plots of randomly selected subjects of lnfev versus age and height
+library(measurements)
+dat1 <- dat1 %>% mutate(height_ft = conv_unit(height, "m", "ft"))
+dat1 <- dat1 %>% mutate(ht_ft = trunc(height_ft))
+ggplot(dat1,aes(x=as.factor(ht_ft),y=lnfev))+geom_boxplot() 
+
+```
+
+## Review of longitudinal versus cross-sectional effects
+Consider the model:
+
+$$ E(Y_{ij} \mid X_{ij}, X_{i1}) = \beta_0 + \beta_1 X_{i1}+\beta_2 (X_{ij}-X_{i1}) $$
+- In this case, $\beta_1$ is the so-called cross-sectional association, where as $\beta_2$ is the longitudinal (a change in the mean for a one unit change in covariate from baseline, keeping baseline value fixed).
+
+## Alternative parameterization
+- An equivalent (will fit the data exactly the same) is 
+$$ E(Y_{ij} \mid X_{ij}, X_{i1}) = \beta_0 + \beta^*_1 X_{i1}+\beta_2 X_{ij}$$
+where we know use $\beta_1^*$ instead of $\beta_1$ because they are different parameters.
+- However, it is easy to see that $\beta_1^* = \beta_1 - \beta_2$.
+- Thus, it's just a question of which output is more conventient since these are both equivalent (much like choosing different baseline values in making dummy variables does not change the fit nor estimation of same parameters).
+
+## Our specific models
+- We will use just one of these parameterizations, but not just with one variable, but two (height and age).
+- Thus, our models become either (with $X_{ij1}$ log(height) for subject i, time j, and $X_{ij2}$ is the corresponding age):
+
+$$ E(Y_{ij} \mid X_{ij1}, X_{i11}, \mid X_{ij2}, X_{i12}) = \beta_0 + \beta_1 X_{i11}+\beta_2 (X_{ij1}-X_{i11}) + $$
+$$ \beta_3 X_{i12}+\beta_4 (X_{ij2}-X_{i12})$$
+
+## Independence Working Correlation
+```{r ex1, size="tiny"}
+# independence
+
+gee_ind <- gee(lnfev~+initlnheight+lnheightchange+
+ initage+agechange, childid, data=dat1,family=gaussian, corstr = "independence")
+
+# Make easier to read summary
+ss1 <- data.frame(summary(gee_ind)$coefficients)
+ss1 = data.frame(ss1,pvalue=2*(1-pnorm(abs(ss1[,5]))))
+round(ss1,4)
+```
+
+
+## Results
+
+\includegraphics[width=4.5in]{Chap5Part4Res.pdf}
+
+## Get estimates of changes in age and changes in height
+
+```{r sum_ind}
+source("gee_post_estimate.R")
+comps = rbind(c(0,0,0.5,0,0),c(0,0,0,0,1))
+gee.post.estimate(gee_ind,comps,labs=c("log(height)","age"),rounded=3,exponentiate=FALSE)
+```
+
+## Exchangeable
+```{r ex1b, size="tiny"}
+gee_exc <- gee(lnfev~+initlnheight+lnheightchange+
+ initage+agechange, childid, data=dat1,family=gaussian, corstr = "exchangeable")
+
+# Make easier to read summary
+ss2 <- data.frame(summary(gee_exc)$coefficients)
+ss2 = data.frame(ss2,pvalue=2*(1-pnorm(abs(ss2[,5]))))
+round(ss2,4)
+```    
+
+## Get estimates of changes in age and changes in height
+
+```{r sum_exc}
+comps = rbind(c(0,0,0.5,0,0),c(0,0,0,0,1))
+gee.post.estimate(gee_exc,comps,labs=c("log(height)","age"),rounded=3,exponentiate=FALSE)
+```
+

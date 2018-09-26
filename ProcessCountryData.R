@@ -1,0 +1,6 @@
+county.dat=read_csv("national_county.csv")
+CCode = as.character(1000*county.dat$StateCode+county.dat$CountyCode)
+nc=nchar(CCode)
+CCode[nc==4]= paste("0",CCode[nc==4],sep="")
+outdat=data.frame(state=county.dat$State,county=county.dat$County,county_code=CCode)
+write_csv(outdat,"countycodes.csv")

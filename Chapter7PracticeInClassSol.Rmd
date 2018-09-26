@@ -1,0 +1,267 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Analyzing Pain Tolerance in Children'
+author: Alan Hubbard
+date: Nov 1, 2018
+output: 
+  beamer_presentation:
+    slide_level: 2  
+header-includes:
+  - \usepackage{pdfpages}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r global_options, include=FALSE}
+# This bit of code lets you set the font size
+# in heading of code junk when writing to beamer.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
+# Libraries
+library(tidyverse)
+library(lme4)
+library(sjstats)
+```
+
+## Read in data
+```{r prelim1, size="tiny"}
+dat=read_csv("Weisspain.csv")
+tbl_df(dat)
+```
+## Description of Data
+The Pediatric Pain data has up to four observations on 64 elementary school
+children aged eight to ten (Fanurik, Zeltzer, Roberts, and Blount 1993). The
+response is the length of time in seconds that a child can tolerate keeping
+his or her arm in very cold water (the cold pressor task), a proxy measure
+of pain tolerance (\texttt{paintol}). After the cold becomes intolerable, the 
+child removes his
+or her arm, the arm is toweled off, and no harm is caused. There is some
+missing data due to kids having casts on an arm or being absent, but no
+one dropped out for reasons related to the experiment. Subjects underwent
+two trials during a first visit followed by two more trials during a second
+visit after a two-week gap (so, hierarchical data of trials within 
+visits within children). The first trial uses the dominant arm, the right
+arm for right-handed children, and the left arm for left-handers. The second
+trial is with the non-dominant arm.
+Subjects were asked what they were thinking about during the first two
+trials. Those who were thinking about the experiment, the experimental
+apparatus, the feelings from their arms, and so on, were classified as having
+an attender  coping style (cs). Those who thought about other things:
+the wall, homework from school, going to the amusement park, or things
+unrelated to the experiment were classified as having a distracter coping
+style.
+
+A randomized treatment (treatment) was administered prior to the fourth
+trial. The treatment consisted of a ten-minute counseling intervention
+where coping advice was given either to attend, distract or no
+direction.  
+
+```{r }
+table(dat$treatment)
+```
+
+
+
+(NOTE - that means that there currently is not a variable that 
+indicates specifically for time 4, there is three treatment groups). So we make 
+one now.
+
+```{r}
+# Make 2 dummy variables to indicate  attend and distract
+dat <- dat %>% mutate(attend = (treatment == "attend" & trial==4)) %>% 
+  mutate(distract = (treatment == "distract" & trial==4))
+# Make indicator of visit and type 
+dat <- dat %>% mutate(visit = trial > 2) %>% mutate(attender = cs=="attender") 
+
+```
+
+
+
+## Distribution by Trial
+```{r, echo=F}
+ggplot(dat,aes(x=factor(trial),y=paintol))+geom_boxplot() 
+```
+## Distribution by Treatment at trial 4
+
+```{r }
+ggplot(subset(dat,trial==4),aes(x=factor(treatment),y=paintol))+geom_boxplot() 
+
+```
+
+## Other relevant graphical summaries?
+
+```{r }
+#<< PUT YOUR CODE HERE >>
+
+```
+## Fit and summarize models
+The goal is to, with one model, estimate the association of the type (cs) of subject 
+and pain tolerance when not treated, as well as the impact of the two treatments
+(vs. no direction), as well as if the treatment effects differ by type (cs).
+Fit a series of models starting from simple ordinary linear regression up to
+different types of random effects models.
+
+## Data
+
+
+- $Y_{ijk}$ is outcome for ith person ($i=1,\ldots,64$), jth visit ($j=1,2$), kth repeat ($k=1,2$), 
+- $T_{ijk1}$ is indicator of attend (treatment), 
+- $T_{ijk2}$ is indicator of distract (treatment), 
+- $A_{ijk}$ is indicator of being an attender (cs), 
+- $sex_{ijk}$ is indicator of male
+- $age_{ijk}$ is age in years, and 
+- $ses_{ijk}$ is the socio-economic status.
+
+- $O_i = (Y_{ijk},\vec{T}_{ijk},A_{ijk},age_{ijk},ses_{ijk},sex_{ijk},j=1,2, k=1,2)$
+
+## Models
+1. $Y_{ijk} = \beta_0+\beta_1 age_{ijk} + \beta_2 ses_{ijk}+\beta_3 sex_{ijk} +\beta_4 A_{ijk}+\beta_5 T_{ijk1}+\beta_6 T_{ijk2}+\beta_7 A*T_{ijk1} + \beta_8 A*T_{ijk1} + e_{ijk}$
+2. $Y_{ijk} = \beta_0+\beta_{0i}+\beta_1 age_{ijk} + \beta_2 ses_{ijk} +\beta_3 sex_{ijk} +\beta_4 A_{ijk}+\beta_5 T_{ijk1}+\beta_6 T_{ijk2}+\beta_7 A*T_{ijk1} + \beta_8 A*T_{ijk1}+e_{ijk}$
+3. $Y_{ijk} = \beta_0+\beta_{0i}+\beta_{0ij}+\beta_1 age_{ijk} + \beta_2 ses_{ijk} ++\beta_3 sex_{ijk} +\beta_4 A_{ijk}+\beta_5 T_{ijk1}+\beta_6 T_{ijk2}+\beta_7 A*T_{ijk1} + \beta_8 A*T_{ijk1}+e_{ijk}$
+4. $Y_{ijk} = \beta_0+\beta_{0i}+\beta_1 age_{ijk} + \beta_2 ses_{ijk} +\beta_3 sex_{ijk} +(\beta_4+\beta_{4i}) A_{ijk}+\beta_5 T_{ijk1}+\beta_6 T_{ijk2}+\beta_7 A*T_{ijk1} + \beta_8 A*T_{ijk1}+e_{ijk}$
+
+## Parameters/Tests of Interests
+
+Impact of treated (relative to no direction).
+1. Difference in means of those with got attend vs. no direction.
+$$E(Y_{ijk}|age_{ijk}=age, ses_{ijk}=s,sex_{ijk}=sx, A_{ijk}=a,T_{ijk1}=1,T_{ijk1}=0) $$
+$$-E(Y_{ijk}|age_{ijk}=age, ses_{ijk}=s,sex_{ijk}=sx,A_{ijk}=a,T_{ijk1}=0,T_{ijk1}=0) $$
+$$ = (\beta_0+\beta_1 age + \beta_2 ses + \beta_3 sx + \beta_4 a+ \beta_5 * 1+ \beta_6*0+\beta_7*a*1+\beta_8*a*0 $$
+$$ - (\beta_0+\beta_1 age + \beta_2 ses +\beta_3 sx + \beta_4 a+ \beta_5 * 0+ \beta_6*0+\beta_7*a*0+\beta_8*a*0 $$
+$$ =  \beta_5 +\beta_7*a $$
+2. Difference in means of those with got distract vs. no direction.
+$$ =  \beta_6 +\beta_8*a $$
+
+
+## Model 1
+```{r }
+#<< PUT YOUR CODE HERE >>
+#  OLS
+# make interaction terms
+dat <- dat %>% mutate(attend_attender = attend*attender) %>% mutate(distract_attender = distract*attender)
+lm_1 <- glm(paintol ~ sex+ses+age+attender+attend+distract+attend_attender+distract_attender, data=dat,family="gaussian",na.action=na.omit)
+summary(lm_1)
+# Residual SD
+sigma(lm_1) 
+# AIC
+AIC(lm_1)
+```
+
+
+## Estimates of parameters of interest
+```{r }
+## Attend vs. no direction among non-attenders
+comps=rbind(c(b0=0,b1=0,b2=0,b3=0,b4=0,b5=1,b6=0,b7=0,b8=0),
+            c(b0=0,b1=0,b2=0,b3=0,b4=0,b5=1,b6=0,b7=1,b8=0),
+            c(b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=1,b7=0,b8=0),
+            c(b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=1,b7=0,b8=1))
+labels=c("Attend vs. noD (non-attenders)",
+         "Attend vs. noD (attenders)",
+         "distract vs. noD (non-attenders)",
+         "distract vs. noD (attenders)")
+source("glm_post_estimate.R")
+post1 <- glm.post.estimate(lm_1,comps,labs=labels)
+post1
+```
+
+## Model 2
+```{r mod2, size="tiny"}
+lme_2 <- lmer(paintol ~ sex+ses+age+attender+attend+distract+attend_attender+distract_attender + (1|id), data=dat)
+summary(lme_2)
+AIC(lme_2)
+```
+
+## Model 2 Stats
+```{r post2a, size="tiny"} 
+# ICC - var(b0i)/(var(b0i)+var(eij))
+icc(lme_2)
+AIC(lme_2)
+# Now do by grabbing relevant objects
+rand_vars2 <- re_var(lme_2)
+rand_vars2
+rand_vars2[2]/(rand_vars2[1]+rand_vars2[2])
+```
+
+
+
+## Estimates of parameters of interest
+```{r post2b}
+source("glmer_post_estimate.R")
+post2 <- glmer.post.estimate(lme_2,comps,labs=labels,
+                            exponentiate = F)
+
+post2
+```
+
+## Model 3
+```{r mod3, size="tiny"}
+lme_3 <- lmer(paintol ~ sex+ses+age+attender+attend+distract+attend_attender+distract_attender + (1|id/visit), data=dat)
+summary(lme_3)
+AIC(lme_3)
+```
+
+## Model 3 Stats
+```{r post3a, size="tiny"} 
+# ICC
+icc(lme_3)
+# Now do by grabbing relevant objects
+rand_vars3 <- re_var(lme_3)
+rand_vars3
+# ICC id
+rand_vars3[3]/(sum(rand_vars3))
+# ICC visit in id
+rand_vars3[2]/(sum(rand_vars3))
+```
+
+## Estimates of parameters of interest
+```{r post3b}
+post3 <- glmer.post.estimate(lme_3,comps,
+                             labs=labels,exponentiate = F)
+post3
+```
+
+
+## Model 4
+```{r mod4, size="tiny"}
+lme_4 <- lmer(ph ~ co2+(co2|id)+co22, data=dat)
+lme_4 <- lmer(paintol ~ sex+ses+age+attender+attend+distract+attend_attender+distract_attender + (1|id)+(1|attend), data=dat)
+
+summary(lme_4)
+AIC(lme_4)
+```
+
+## Model 4 Stats
+```{r post4a, size="tiny"} 
+# ICC
+icc(lme_4)
+# Now do by grabbing relevant objects
+rand_vars4 <- re_var(lme_4)
+rand_vars4
+# ICC id at Xijk=0
+rand_vars4[2]/(rand_vars4[1]+rand_vars4[2])
+```
+
+## Estimates of parameters of interest
+```{r post4b}
+# Note, if co2 is x, then co22 is x^2
+post4 <- glmer.post.estimate(lme_4,comps,
+                             labs=labels,exponentiate = F)
+post4
+```
+
+## Compare the AIC of 4 models
+```{r }
+AIC(lm_1)
+AIC(lme_2)
+AIC(lme_3)
+AIC(lme_4)
+```
+## Report the results of the chosen model
+
+Put your answer here
+
+

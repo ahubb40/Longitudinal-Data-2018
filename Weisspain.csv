@@ -1,0 +1,257 @@
+﻿id,ses,cs,treatment,sex,age,trial,paintol,l2paintol
+1,73.5,attender,attend,female,10.08333333,1,20.55,4.361066489
+1,73.5,attender,attend,female,10.08333333,2,35.31,5.142004916
+1,73.5,attender,attend,female,10.08333333,3,14.29,3.836934011
+1,73.5,attender,attend,female,10.08333333,4,11.71,3.549669171
+3,81.5,attender,no directions,female,8.666666667,1,12,3.584962501
+3,81.5,attender,no directions,female,8.666666667,2,10,3.321928095
+3,81.5,attender,no directions,female,8.666666667,3,12.25,3.614709844
+3,81.5,attender,no directions,female,8.666666667,4,8.27,3.047887329
+5,54,attender,attend,male,10.16666667,1,24.91,4.638653117
+5,54,attender,attend,male,10.16666667,2,23.41,4.549053029
+5,54,attender,attend,male,10.16666667,3,31.15,4.961160258
+5,54,attender,attend,male,10.16666667,4,31.38,4.971773447
+8,71,attender,no directions,male,9.666666667,1,10.12,3.339137385
+8,71,attender,no directions,male,9.666666667,2,11.05,3.465974465
+8,71,attender,no directions,male,9.666666667,3,12.15,3.602884409
+8,71,attender,no directions,male,9.666666667,4,13.86,3.792855352
+9,77.5,attender,attend,female,9.166666667,1,21.77,4.444269502
+9,77.5,attender,attend,female,9.166666667,2,19.03,4.250203657
+9,77.5,attender,attend,female,9.166666667,3,37.25,5.219168521
+9,77.5,attender,attend,female,9.166666667,4,30.37,4.924575003
+12,74.7,attender,attend,male,9.75,1,27.17,4.76394266
+12,74.7,attender,attend,male,9.75,2,26.3,4.716990894
+12,74.7,attender,attend,male,9.75,3,22.01,4.46008724
+12,74.7,attender,attend,male,9.75,4,28.64,4.839959588
+15,76.7,attender,attend,female,9.666666667,1,16.75,4.066089191
+15,76.7,attender,attend,female,9.666666667,2,13.47,3.751677946
+15,76.7,attender,attend,female,9.666666667,3,12.49,3.642701572
+15,76.7,attender,attend,female,9.666666667,4,15.98,3.998195503
+18,72.7,attender,no directions,male,9.5,1,22.48,4.49057013
+18,72.7,attender,no directions,male,9.5,2,20.03,4.324090516
+18,72.7,attender,no directions,male,9.5,3,,
+18,72.7,attender,no directions,male,9.5,4,26.82,4.745237332
+21,46.2,attender,no directions,female,10.66666667,1,240,7.906890596
+21,46.2,attender,no directions,female,10.66666667,2,240,7.906890596
+21,46.2,attender,no directions,female,10.66666667,3,231.71,7.856176498
+21,46.2,attender,no directions,female,10.66666667,4,116.68,6.866413481
+23,52.2,attender,distract,female,9.416666667,1,30.39,4.92552477
+23,52.2,attender,distract,female,9.416666667,2,42.22,5.399854674
+23,52.2,attender,distract,female,9.416666667,3,18.72,4.22650853
+23,52.2,attender,distract,female,9.416666667,4,41.44,5.372952098
+25,76.7,attender,no directions,female,8.833333333,1,11.04,3.464668267
+25,76.7,attender,no directions,female,8.833333333,2,6.24,2.641546029
+25,76.7,attender,no directions,female,8.833333333,3,9.97,3.317593505
+25,76.7,attender,no directions,female,8.833333333,4,7.13,2.833902077
+26,70.5,attender,distract,female,10.16666667,1,34.15,5.093813673
+26,70.5,attender,distract,female,10.16666667,2,18.77,4.230356745
+26,70.5,attender,distract,female,10.16666667,3,23.34,4.544732656
+26,70.5,attender,distract,female,10.16666667,4,20.34,4.346247774
+27,76.3,attender,no directions,female,9.083333333,1,15.95,3.995484519
+27,76.3,attender,no directions,female,9.083333333,2,9.63,3.267535798
+27,76.3,attender,no directions,female,9.083333333,3,16.19,4.017031081
+27,76.3,attender,no directions,female,9.083333333,4,15.28,3.933572638
+28,84.3,attender,distract,male,9.666666667,1,21.43,4.421559945
+28,84.3,attender,distract,male,9.666666667,2,18.13,4.18030702
+28,84.3,attender,distract,male,9.666666667,3,13.17,3.719183441
+28,84.3,attender,distract,male,9.666666667,4,19.33,4.272769732
+30,67.5,attender,distract,female,9.666666667,1,16.89,4.078097423
+30,67.5,attender,distract,female,9.666666667,2,11.42,3.513490746
+30,67.5,attender,distract,female,9.666666667,3,14.81,3.888499736
+30,67.5,attender,distract,female,9.666666667,4,27.44,4.778208576
+33,75.9,attender,distract,female,9.833333333,1,35.88,5.165107985
+33,75.9,attender,distract,female,9.833333333,2,53.04,5.72900887
+33,75.9,attender,distract,female,9.833333333,3,,
+33,75.9,attender,distract,female,9.833333333,4,,
+34,81.5,attender,attend,female,9.666666667,1,51.85,5.696272084
+34,81.5,attender,attend,female,9.666666667,2,30.84,4.94673086
+34,81.5,attender,attend,female,9.666666667,3,51.45,5.685099172
+34,81.5,attender,attend,female,9.666666667,4,37.03,5.210622644
+36,72.3,attender,attend,female,9.25,1,18.45,4.205548911
+36,72.3,attender,attend,female,9.25,2,11.92,3.575312331
+36,72.3,attender,attend,female,9.25,3,21.63,4.43496176
+36,72.3,attender,attend,female,9.25,4,44.72,5.482848283
+37,76.7,attender,distract,female,9.083333333,1,9.95,3.314696526
+37,76.7,attender,distract,female,9.083333333,2,12.99,3.699329526
+37,76.7,attender,distract,female,9.083333333,3,25.02,4.645009884
+37,76.7,attender,distract,female,9.083333333,4,34.76,5.119356177
+38,62.5,attender,attend,female,9.5,1,27.91,4.802710219
+38,62.5,attender,attend,female,9.5,2,23.29,4.541638734
+38,62.5,attender,attend,female,9.5,3,22.02,4.460742564
+38,62.5,attender,attend,female,9.5,4,20.67,4.369466484
+40,74.7,attender,no directions,female,9.25,1,20.81,4.37920506
+40,74.7,attender,no directions,female,9.25,2,16.87,4.076388069
+40,74.7,attender,no directions,female,9.25,3,16.83,4.072963272
+40,74.7,attender,no directions,female,9.25,4,18.88,4.23878686
+42,75.1,attender,distract,female,8.833333333,1,52.58,5.716442237
+42,75.1,attender,distract,female,8.833333333,2,,
+42,75.1,attender,distract,female,8.833333333,3,,
+42,75.1,attender,distract,female,8.833333333,4,,
+45,64.7,attender,distract,male,8.75,1,13.19,3.72137266
+45,64.7,attender,distract,male,8.75,2,16.44,4.039138394
+45,64.7,attender,distract,male,8.75,3,14.44,3.851998837
+45,64.7,attender,distract,male,8.75,4,12.63,3.658782734
+49,60.4,attender,no directions,female,9.583333333,1,32.21,5.009436756
+49,60.4,attender,no directions,female,9.583333333,2,33.54,5.067810784
+49,60.4,attender,no directions,female,9.583333333,3,19.51,4.286141873
+49,60.4,attender,no directions,female,9.583333333,4,22.65,4.501439145
+50,80.3,attender,no directions,female,8.5,1,42.79,5.419201774
+50,80.3,attender,no directions,female,8.5,2,38.85,5.279842694
+50,80.3,attender,no directions,female,8.5,3,39.55,5.30560579
+50,80.3,attender,no directions,female,8.5,4,48.42,5.597531174
+51,49.4,attender,distract,male,9,1,19.69,4.299391206
+51,49.4,attender,distract,male,9,2,13.41,3.745237332
+51,49.4,attender,distract,male,9,3,14.55,3.862947248
+51,49.4,attender,distract,male,9,4,21.19,4.405311683
+57,68.3,attender,attend,female,8.916666667,1,35.07,5.132165526
+57,68.3,attender,attend,female,8.916666667,2,32.84,5.037382222
+57,68.3,attender,attend,female,8.916666667,3,26.11,4.706530553
+57,68.3,attender,attend,female,8.916666667,4,25.21,4.655924213
+58,51.1,attender,attend,female,8.416666667,1,25.09,4.649040566
+58,51.1,attender,attend,female,8.416666667,2,30.66,4.938285792
+58,51.1,attender,attend,female,8.416666667,3,39.84,5.316145742
+58,51.1,attender,attend,female,8.416666667,4,38.47,5.265661925
+59,62,attender,no directions,female,9.583333333,1,21.97,4.457462965
+59,62,attender,no directions,female,9.583333333,2,11.19,3.484138131
+59,62,attender,no directions,female,9.583333333,3,15.55,3.958842675
+59,62,attender,no directions,female,9.583333333,4,15.51,3.955126781
+61,77.5,attender,distract,female,,1,53.27,5.735251376
+61,77.5,attender,distract,female,,2,23.18,4.534808661
+61,77.5,attender,distract,female,,3,49.28,5.622930351
+61,77.5,attender,distract,female,,4,14.16,3.82374936
+63,84.3,attender,distract,female,9.666666667,1,18.18,4.184280294
+63,84.3,attender,distract,female,9.666666667,2,27.61,4.787118983
+63,84.3,attender,distract,female,9.666666667,3,14.53,3.860962798
+63,84.3,attender,distract,female,9.666666667,4,27,4.754887502
+64,62.7,attender,distract,female,,1,30.3,4.921245889
+64,62.7,attender,distract,female,,2,16.5,4.044394119
+64,62.7,attender,distract,female,,3,32.51,5.022811651
+64,62.7,attender,distract,female,,4,11.12,3.475084883
+2,74.7,distracter,distract,female,9.25,1,28.13,4.814037648
+2,74.7,distracter,distract,female,9.25,2,24.22,4.59812696
+2,74.7,distracter,distract,female,9.25,3,15.86,3.987320866
+2,74.7,distracter,distract,female,9.25,4,20.3,4.343407822
+4,59.5,distracter,attend,male,10.41666667,1,15.53,3.956985925
+4,59.5,distracter,attend,male,10.41666667,2,22.68,4.503348735
+4,59.5,distracter,attend,male,10.41666667,3,,
+4,59.5,distracter,attend,male,10.41666667,4,,
+6,69.7,distracter,attend,female,8.833333333,1,109.37,6.773073253
+6,69.7,distracter,attend,female,8.833333333,2,85.91,6.424754167
+6,69.7,distracter,attend,female,8.833333333,3,68.58,6.099715999
+6,69.7,distracter,attend,female,8.833333333,4,60.3,5.914086097
+7,75.9,distracter,no directions,male,9.583333333,1,19.79,4.306699707
+7,75.9,distracter,no directions,male,9.583333333,2,18.95,4.244125943
+7,75.9,distracter,no directions,male,9.583333333,3,23.52,4.555816155
+7,75.9,distracter,no directions,male,9.583333333,4,20.35,4.346956889
+10,68.1,distracter,distract,female,9.916666667,1,39.51,5.304145941
+10,68.1,distracter,distract,female,9.916666667,2,41.2,5.364572432
+10,68.1,distracter,distract,female,9.916666667,3,14.51,3.858975614
+10,68.1,distracter,distract,female,9.916666667,4,78,6.285402219
+11,77.5,distracter,distract,male,8.666666667,1,13.38,3.742006211
+11,77.5,distracter,distract,male,8.666666667,2,11.75,3.554588852
+11,77.5,distracter,distract,male,8.666666667,3,10.34,3.370164281
+11,77.5,distracter,distract,male,8.666666667,4,13.29,3.7322692
+13,66.7,distracter,attend,female,9.25,1,33.32,5.058316496
+13,66.7,distracter,attend,female,9.25,2,23.93,4.580748492
+13,66.7,distracter,attend,female,9.25,3,24.81,4.63284983
+13,66.7,distracter,attend,female,9.25,4,20,4.321928095
+14,76.3,distracter,no directions,female,9.083333333,1,59.39,5.892148128
+14,76.3,distracter,no directions,female,9.083333333,2,41.2,5.364572432
+14,76.3,distracter,no directions,female,9.083333333,3,42.95,5.424586226
+14,76.3,distracter,no directions,female,9.083333333,4,40.78,5.34978987
+16,67.7,distracter,no directions,female,10.25,1,35.88,5.165107985
+16,67.7,distracter,no directions,female,10.25,2,45.41,5.504938132
+16,67.7,distracter,no directions,female,10.25,3,34.63,5.113950482
+16,67.7,distracter,no directions,female,10.25,4,44.31,5.469560422
+17,63.9,distracter,distract,female,10.41666667,1,38.14,5.253232939
+17,63.9,distracter,distract,female,10.41666667,2,41.72,5.382667253
+17,63.9,distracter,distract,female,10.41666667,3,71.47,6.159265883
+17,63.9,distracter,distract,female,10.41666667,4,240,7.906890596
+19,76.3,distracter,attend,female,8.583333333,1,17.05,4.091699834
+19,76.3,distracter,attend,female,8.583333333,2,17.53,4.131754091
+19,76.3,distracter,attend,female,8.583333333,3,13.59,3.764473551
+19,76.3,distracter,attend,female,8.583333333,4,21.73,4.441616269
+20,66.9,distracter,no directions,male,9.166666667,1,30.57,4.934044647
+20,66.9,distracter,no directions,male,9.166666667,2,20.29,4.34269696
+20,66.9,distracter,no directions,male,9.166666667,3,,
+20,66.9,distracter,no directions,male,9.166666667,4,11.89,3.57167681
+22,80.3,distracter,no directions,female,9.75,1,39.46,5.302319051
+22,80.3,distracter,no directions,female,9.75,2,44.16,5.464668267
+22,80.3,distracter,no directions,female,9.75,3,51.94,5.698774109
+22,80.3,distracter,no directions,female,9.75,4,65.42,6.031659854
+24,67.8,distracter,distract,female,9.666666667,1,59.23,5.888256181
+24,67.8,distracter,distract,female,9.666666667,2,44.94,5.489928219
+24,67.8,distracter,distract,female,9.666666667,3,46.64,5.543495883
+24,67.8,distracter,distract,female,9.666666667,4,35.97,5.168722254
+29,72.3,distracter,attend,male,8.833333333,1,21.75,4.442943496
+29,72.3,distracter,attend,male,8.833333333,2,10.51,3.393690764
+29,72.3,distracter,attend,male,8.833333333,3,17.62,4.139142019
+29,72.3,distracter,attend,male,8.833333333,4,22.8,4.510961919
+31,65.5,distracter,distract,male,9.416666667,1,240,7.906890596
+31,65.5,distracter,distract,male,9.416666667,2,29.51,4.883132016
+31,65.5,distracter,distract,male,9.416666667,3,240,7.906890596
+31,65.5,distracter,distract,male,9.416666667,4,63.12,5.9800253
+32,79.1,distracter,no directions,male,9.416666667,1,13.78,3.784503983
+32,79.1,distracter,no directions,male,9.416666667,2,88.89,6.473949222
+32,79.1,distracter,no directions,male,9.416666667,3,6.75,2.754887502
+32,79.1,distracter,no directions,male,9.416666667,4,6.67,2.737686761
+35,76.7,distracter,no directions,female,8.833333333,1,13.7,3.776103988
+35,76.7,distracter,no directions,female,8.833333333,2,10.12,3.339137385
+35,76.7,distracter,no directions,female,8.833333333,3,8.35,3.061776198
+35,76.7,distracter,no directions,female,8.833333333,4,7.62,2.929790998
+39,76.3,distracter,attend,female,10.5,1,48.48,5.599317794
+39,76.3,distracter,attend,female,10.5,2,49,5.614709844
+39,76.3,distracter,attend,female,10.5,3,51.07,5.674404154
+39,76.3,distracter,attend,female,10.5,4,43,5.426264755
+41,60.5,distracter,distract,male,10.33333333,1,34.65,5.114783447
+41,60.5,distracter,distract,male,10.33333333,2,25.13,4.651338766
+41,60.5,distracter,distract,male,10.33333333,3,22.7,4.504620392
+41,60.5,distracter,distract,male,10.33333333,4,31.04,4.956056652
+43,69.8,distracter,no directions,male,8.75,1,32.73,5.032541697
+43,69.8,distracter,no directions,male,8.75,2,38.89,5.28132733
+43,69.8,distracter,no directions,male,8.75,3,36.75,5.199672345
+43,69.8,distracter,no directions,male,8.75,4,20.9,4.385431037
+44,77.5,distracter,no directions,female,9.166666667,1,,
+44,77.5,distracter,no directions,female,9.166666667,2,16.75,4.066089191
+44,77.5,distracter,no directions,female,9.166666667,3,,
+44,77.5,distracter,no directions,female,9.166666667,4,14.66,3.873813198
+46,75.5,distracter,distract,male,10.25,1,20.58,4.363171077
+46,75.5,distracter,distract,male,10.25,2,29.35,4.875288598
+46,75.5,distracter,distract,male,10.25,3,24.83,4.634012356
+46,75.5,distracter,distract,male,10.25,4,55.27,5.788424707
+47,64.8,distracter,attend,male,8.75,1,17.59,4.136683578
+47,64.8,distracter,attend,male,8.75,2,12.42,3.634593268
+47,64.8,distracter,attend,male,8.75,3,11.12,3.475084883
+47,64.8,distracter,attend,male,8.75,4,8.06,3.010779839
+48,77.5,distracter,attend,male,9.25,1,20.53,4.359661722
+48,77.5,distracter,attend,male,9.25,2,12.58,3.653060017
+48,77.5,distracter,attend,male,9.25,3,17.17,4.101818134
+48,77.5,distracter,attend,male,9.25,4,15.63,3.966245873
+52,73.1,distracter,distract,male,9.833333333,1,71.57,6.161283075
+52,73.1,distracter,distract,male,9.833333333,2,42.58,5.412104045
+52,73.1,distracter,distract,male,9.833333333,3,107.27,6.745102847
+52,73.1,distracter,distract,male,9.833333333,4,48.94,5.612942196
+53,66.9,distracter,attend,male,9.583333333,1,116.49,6.864062303
+53,66.9,distracter,attend,male,9.583333333,2,52.01,5.700717133
+53,66.9,distracter,attend,male,9.583333333,3,26.06,4.703765179
+53,66.9,distracter,attend,male,9.583333333,4,20.16,4.333423734
+54,63.9,distracter,attend,female,9.916666667,1,37.18,5.216454865
+54,63.9,distracter,attend,female,9.916666667,2,14.47,3.854993017
+54,63.9,distracter,attend,female,9.916666667,3,21.96,4.456806149
+54,63.9,distracter,attend,female,9.916666667,4,14.53,3.860962798
+55,70.2,distracter,no directions,male,9.916666667,1,16.85,4.074676686
+55,70.2,distracter,no directions,male,9.916666667,2,24.51,4.615298579
+55,70.2,distracter,no directions,male,9.916666667,3,16.93,4.081510068
+55,70.2,distracter,no directions,male,9.916666667,4,12.19,3.607626221
+56,68.5,distracter,distract,female,8.833333333,1,240,7.906890596
+56,68.5,distracter,distract,female,8.833333333,2,240,7.906890596
+56,68.5,distracter,distract,female,8.833333333,3,240,7.906890596
+56,68.5,distracter,distract,female,8.833333333,4,240,7.906890596
+60,62.8,distracter,attend,male,9.166666667,1,48.48,5.599317794
+60,62.8,distracter,attend,male,9.166666667,2,240,7.906890596
+60,62.8,distracter,attend,male,9.166666667,3,240,7.906890596
+60,62.8,distracter,attend,male,9.166666667,4,104.5,6.707359132
+62,60.4,distracter,distract,female,,1,21.63,4.43496176
+62,60.4,distracter,distract,female,,2,36.43,5.18705509
+62,60.4,distracter,distract,female,,3,39.65,5.309248961
+62,60.4,distracter,distract,female,,4,180.19,7.493375138

@@ -1,0 +1,233 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Methods for Longitudinal Repeated Measures Data'
+author: Alan Hubbard
+date: Oct 16, 2018
+output: 
+  beamer_presentation:
+    keep_tex: TRUE
+#output: pdf_document
+#output: 
+#  slidy_presentation:
+header-includes:
+  - \usepackage{pdfpages}
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load libraries and read in data
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(cowplot)
+library(tidyr)
+library(lme4)
+library(gee)
+```
+
+
+```{r readin, message=F, warning=F}
+dat=read_csv("teensex.csv")
+## Look at data
+tbl_df(dat)
+```
+
+# Data,Notation
+- child = "eid""
+- dat of survey is "today"
+- drug or alchol use is drgalcoh, $X_{ij} = 1$ yes, 0 for no.
+- outcome (sexual activity)  $Y_{ij} = 1$ for yes, 0 for no.
+
+# Convert "today" variable into a system-recognized date.
+
+```{r dateconv, message=F,warning=F}
+knitr::asis_output("\\footnotesize")
+# dmy converts strings in form of day-month-yr into system
+# dates. year gets the year from the date.
+dat <- dat %>% mutate(date=dmy(today)) %>% mutate(year=year(date)) 
+# get rid of observations (probably errors) with year < 1998
+dat <- subset(dat,year > 1997)
+# Group by id to get minimum date by id
+dat <- dat %>% group_by(eid) %>% mutate(mind = min(date,na.rm=F))
+```
+
+# Data Summaries
+- We do simple summaries to look at the proportion of observations that report sexual activity overall and by id, as well as by drug/alchol group
+
+
+```{r datsum, echo=F}
+knitr::asis_output("\\tiny")
+dat %>% group_by(drgalcoh) %>% summarise(PY1 = mean(sx24hrs))
+dat.id <- dat %>% group_by(eid) %>% summarise(PY1 =
+  mean(sx24hrs,na.rm = T),PX1 = mean(drgalcoh,na.rm = T))
+p1<-ggplot(dat.id,aes(x=PY1))+
+  geom_histogram(bins=15,col="black",fill="white")+
+  ggtitle("Dist. of prop. of days reporting sex by id")+
+  labs(x="Pi(Yij=1)")+ 
+  theme(plot.title = element_text(size=12)) +
+  geom_vline(xintercept=mean(dat.id$PY1,na.rm = T))
+p2<-ggplot(dat.id,aes(x=PX1))+
+  geom_histogram(bins=15,col="black",fill="white")+
+  ggtitle("Dist. of prop. of days reporting drug/alc by id")+
+  labs(x="Pi(Xij=1)")+ 
+  theme(plot.title =element_text(size=12))+
+  geom_vline(xintercept=mean(dat.id$PX1,na.rm = T))
+```
+# Display plots
+```{r plots}
+knitr::asis_output("\\tiny")
+plot_grid(p1,p2, scale=0.7)
+```
+
+# Comments on data summaries
+- One can see large variation in the proportion of days reported for both relevant events (both $X_{ij},Y_{ij}$) across individuals.
+- Subjects report an average of around 25\% yeses for both variables.
+- We will look at ways of modeling this variability below.
+
+
+# Transition Models
+-We wish to fit the model:
+$$logit[P(Y_{ij}=1 \mid X_{ij}, Y_{i,j-1})] = \beta_0^{TM}+\beta_1^{TM}X_{ij}+\beta_2^{TM} Y_{i,j-1}$$
+- We will assume that $$Y_{ij} \perp (Y_{i1},Y_{i2},\cdots,Y_{i,j-2}) \mid X_{ij},Y_{i,j-1}$$
+
+so, no correlation with past $Y$'s given the most recently measured one.
+
+- First, we need to make a variable of the lagged value of outcome (by 1 row), ** by id **. 
+- Note first, that because one of the variables depends on the value the next observations, it's blank for the first observation.
+
+
+# Make lag variable
+
+```{r makelag}
+knitr::asis_output("\\tiny")
+# order by date with eid
+dat <- arrange(dat,eid,date)
+# get new variable which is lagged (by 1) outcome (Y_{ii,j-1})
+dat_new <- dat %>% group_by(eid) %>% mutate(yprev = lag(sx24hrs))
+dat_new[22:33,]
+```
+
+# Fit standard logistic regression
+- Given our assumptions of conditional independence above, we have no residual correlation of observations on the same subject conditional on the past outcome and current drug and alcohol use.
+- Thus, we fit the coefficients using standard logistic regression.
+
+# GLM in R
+```{r tmglm}
+knitr::asis_output("\\tiny")
+glm_tm <- glm(sx24hrs ~ drgalcoh+yprev, data=dat_new, family =binomial(),na.action=na.omit)
+summary(glm_tm)
+```
+# Get associations at right scale
+- See a strong positive relationship of both previous recorded days sexual activity as well as current days reporting alcohol/drug use and sexual activity.
+- We now put into more interpretable odds ratio form.  Again, can do this several ways, but we'll use the function we've used before.  We only have binary predictors, so the relevant OR's are just comparing yes (1) to no (0) for both.
+
+```{r summarytm}
+knitr::asis_output("\\footnotesize")
+source("glm_post_estimate.R")
+comps <- rbind(c(0,1,0),c(0,0,1))
+or_tm <- glm.post.estimate(glm_tm,comps, 
+  labs=c("drug/alc","previousY"),exponentiate = T)            
+or_tm
+```
+# Interpretation
+- One can see that the estimate odds ratio suggests about a doubling of the probability of reporting sexual activity if it was reported the previous day (keep drugs and alcohol fixed).  
+    + This obviously suggest a strong correlation of outcomes at least over a 1-day interval.
+- There is also a strong positive association of drug/alc use in the current day versus reported sexual activity.
+
+# Random (mixed) effects models
+- We will talk extensively about such models in next part of class, but for now a brief introduction using the data on teenagers.  
+- This approach implicitly models the correlation by assuming a latent variable model that implies correlation of observations made on same subject.
+- Specifically in this case, the model is:
+
+$$logit[P(Y_{ij}=1 \mid X_{ij}, \beta_{0i}] = \beta_0^{RE}+\beta_{0i}+\beta_1^{RE}X_{ij}$$
+where it is assumed that the $\beta_{0i}$ are random, independent normally distributed variables: $\beta_{0i} \sim N(0, \tau)$.
+- This models assumes that 
+$$Y_{ij} \perp Y_{ij'}, j' \ne j,  \mid \beta_{0i},X_{ij},$$.
+
+# How to estimate it in R
+```{r randeff}
+knitr::asis_output("\\tiny")
+glmer_mod <- glmer(sx24hrs ~ drgalcoh+(1|eid), data=dat_new, family =binomial(),na.action=na.omit)
+summary(glmer_mod)
+```
+- Need slight modification of the glm.post.estimation code to get it to work with a lme4 object.
+
+```{r glmeror}
+knitr::asis_output("\\footnotesize")
+source("glmer_post_estimate.R")
+comps <- c(0,1)
+or_re <- glmer.post.estimate(glmer_mod,comps,labs=c("drug/alc"),exponentiate = T)            
+or_re
+```
+
+# get other estimates of unique to the mixed models ( such as $\tau \equiv SD(\beta_{0i})$)
+- Other information besides "fixed effect" coefficients.
+- For instance, the standard deviation of the random effects (we just have one in this case).  
+- We will spend more time on this later.
+- Below is the estimate of $SD(\beta_{0i})$
+```{r otherparms}
+VarCorr(glmer_mod)
+
+```
+
+# Generalized Estimating Equation (GEE)
+- Finally, we fit a simple linear model, but use the GEE approach to get the inference accounting for the repeated measures.
+- As discussed in slides, we can use different working correlation matrices to fit the coeffients.
+- In this case, we use independence, so the estimates will be the same as if done by standard logistic regression.
+- However, the robust inference will adjust for the correlation when deriving standard errors (SE'S).
+
+# GEE in R
+```{r gee}
+knitr::asis_output("\\tiny")
+
+gee_fit <- gee(sx24hrs ~ drgalcoh, eid, data=dat_new,family=binomial, corstr = "independence")
+# Make easier to read summary
+ss <- data.frame(summary(gee_fit)$coefficients)
+ss = data.frame(ss,pvalue=2*(1-pnorm(abs(ss[,5]))))
+round(ss,4)
+```
+
+We need slightly altered functions to get post-hoc estimates of linear combination of coefficients.
+
+```{r geeres}
+knitr::asis_output("\\tiny")
+source("gee_post_estimate.R")
+comps <- c(0,1)
+or_gee <- gee.post.estimate(gee_fit,comps,labs=c("drug/alc"),exponentiate = T)            
+or_gee
+
+```
+
+# Comparing GEE/RE model
+- One can see that, though both the GEE approach and the random effects model account for correlation when deriving their inference, they give quite different estimates of the the OR (`r or_re[1]` versus `r or_gee[1]`). 
+
+- Why??
+
+# Different correlation model for GEE
+
+- Now we do a GEE model again, but using a different working correlation model (exchangeable in this case).  
+
+- This one assumes that all observations on the same individual are equally correlated.
+
+- It just involves one small change in the gee function.
+
+# Re-fit with exchangeable working correlation
+```{r exchgee}
+knitr::asis_output("\\tiny")
+gee_fit <- gee(sx24hrs ~ drgalcoh, eid, data=dat_new,family=binomial, corstr = "exchangeable")
+# Make easier to read summary
+ss <- data.frame(summary(gee_fit)$coefficients)
+ss = data.frame(ss,pvalue=2*(1-pnorm(abs(ss[,5]))))
+round(ss,4)
+or_gee_exch <- gee.post.estimate(gee_fit,comps,labs=c("drug/alc"),exponentiate = T)            
+or_gee_exch
+```
+
+# Comparing independence and exchangeable working correlation
+- As one can see, there is also a big difference in the estimate of the odds ratio of drug/alcohol for two different runs of the GEE approach, but with different working correlation models.
+
+- Why?
+
+

@@ -1,0 +1,135 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Linear Models with repeated measures'
+author: Alan Hubbard
+date: Oct 2, 2018
+output: 
+  beamer_presentation:
+    keep_tex: TRUE
+#output: pdf_document
+#output: 
+#  slidy_presentation:
+header-includes:
+  - \usepackage{pdfpages}
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+library(dplyr)
+library(MASS)
+library(tidyverse)
+library(cowplot)
+library(tidyr)
+library(multcomp)
+library(lmtest)
+```
+
+
+```{r readin, message=F, warning=F}
+dat <- read_csv("dental.csv")
+tbl_df(dat)
+
+```
+# Data Notation
+- child = i (id)
+- $age  = X_{ij1}$
+- $gender = X_{ij2}$: 1 is male, 0 female
+- measure of teeth $distance = Y_{ij}$
+
+
+# Plot the data
+
+```{r plot1, message=F,echo=F}
+p1 <- ggplot(subset(dat,gender==0), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Girls")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+p2 <- ggplot(subset(dat,gender==1), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Boys")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+plot_grid(p1,p2)
+
+```
+
+
+# Look at basic summaries with dplyr
+
+```{r sum1, message=F, warning=F}
+
+# get number of obs per person and mean
+sum_dat=group_by(dat,child) %>% summarise(mean=mean(distance),n=n(),gender=first(gender))
+table(sum_dat$gender)
+```
+
+
+# Estimate linear model for dental data
+- Again, the model we wanted to estimate is:
+
+$$ E(Y_{ij} \mid \vec{X}_{ij}) = \beta_0 +\beta_1 X_{ij1}+\beta_2 X_{ij2} + \beta_3 X_{ij1}X_{ij2} $$
+
+```{r echo=FALSE}
+# makes the font size adjustable
+knitr::knit_hooks$set(mysize = function(before, options, envir) {
+  if (before) 
+    return(options$size)
+})
+```
+
+# Use simple OLS
+
+```{r dentaldata, mysize=TRUE, size='\\tiny', message=F,warning=F}
+# First, make interaction term
+library(RCurl)
+dat = dat %>% mutate(inter=gender*age)
+ols_fit = lm(distance ~ gender+age+inter, data=dat)
+summary(ols_fit)
+```
+
+
+# Getting estimates of linear combination of coefficients
+
+```{r assocboys,mysize=TRUE, size='\\tiny', message=F,warning=F}
+## Note how the algebra is entered into function
+### For boys
+lin.boys=glht(ols_fit, linfct = c("6*age +6*inter=0"))
+#summary(lin.boys)
+confint(lin.boys)  
+```
+
+# Repeat for girls
+In this case, 
+$$ E(Y_{ij} \mid X_{ij1}=age+6,X_{ij2}=0) -  E(Y_{ij} \mid X_{ij1}=age,X_{ij2}=0) $$
+$$ =  6*\beta_1$$
+
+```{r assocgirls,mysize=TRUE, size='\\tiny', message=F,warning=F}
+
+lin.girls=glht(ols_fit, linfct = c("6*age=0"))
+#summary(lin.girls)
+confint(lin.girls)  
+```
+
+The results suggest that the mean change in the distance for boys is 4.76 (95\% 3.20-6.21) and that for girls is 2.88 (95\% 1.07-4.69).
+
+
+# Inference  sandwich estimator
+
+```{r robust.option, mysize=TRUE, size='\\tiny', message=F,warning=F}
+# Read in user written function using lmtest and 
+# sandwich packages that return both information 
+# on coefficients and estimates of linear
+# combination of coefficients using
+# clustered/robust variance estimates
+source("clx.R")
+source("clx_lincom.R")
+
+clx(ols_fit, 1, dat$child)
+# Robust estimate for change in mean
+# for 6 year increase in age for
+# boys
+clx.lincom(ols_fit, 1,dat$child, c(0,0,6,6))
+
+```
+
+# Comparison of results
+- If one looks at the age coefficient, one can see that the robust SE is much smaller than the naive one returned by standard OLS: 0.065 vs 0.152.  
+- We can also compare the results of the estimate of  
+$$ =  6*\beta_1 + 6*\beta_3$$
+and we see the CI based upon the robust estimates that account for dependence is 3.511-5.911 versus 3.205-6.207, so for this parameter, the CI gets bigger when the SE is estimated correctly.
+

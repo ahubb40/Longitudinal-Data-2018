@@ -1,0 +1,152 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Mixed Models 1'
+author: Alan Hubbard
+date: Oct 25, 2018
+output: 
+  beamer_presentation:
+    slide_level: 2  
+header-includes:
+  - \usepackage{pdfpages}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r global_options, include=FALSE}
+# This bit of code lets you set the font size
+# in heading of code junk when writing to beamer.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+# Libraries
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(lme4)
+```
+
+## Read in data
+```{r prelim1, size="tiny"}
+dat1=read_csv("deeks_ex1.csv")
+tbl_df(dat1)
+```
+
+# Binary time-independent variable (balanced data)
+## Random Intercept Model
+```{r ex1a, size="tiny"}
+# random intercept
+lme_1 <- lmer(cd4 ~ binage + (1|id), data=dat1)
+summary(lme_1)
+```
+
+## post-estimation stats
+```{r ex1stats, size="tiny"} 
+library(sjstats)
+# ICC - var(b0i)/(var(b0i)+var(eij))
+icc(lme_1)
+AIC(lme_1)
+# Now do by grabbing relevant objects
+rand_vars1 <- re_var(lme_1)
+rand_vars1
+rand_vars1[2]/(rand_vars1[1]+rand_vars1[2])
+```
+
+## Random intercept and slope model
+
+```{r ex1b, size="tiny"}
+# random slope - try it, it won't work (not identifiable, why)
+#lme_1b <- lmer(cd4 ~ (binage|id), data=dat1)
+```
+
+# Binary time-dependent variable (balanced data)
+## Read in data
+```{r prelim2, size="tiny"}
+dat2=read_csv("deeks_ex2.csv")
+tbl_df(dat2)
+```
+
+## Random Intercept Model
+```{r ex2a, size="tiny"}
+# random intercept
+lme_2 <- lmer(cd4 ~ medvl + (1|id), data=dat2)
+summary(lme_2)
+```
+
+## post-estimation stats
+```{r ex2stats, size="tiny"} 
+# ICC - var(b0i)/(var(b0i)+var(eij))
+icc(lme_2)
+AIC(lme_2)
+# Now do by grabbing relevant objects
+rand_vars2 <- re_var(lme_2)
+rand_vars2
+rand_vars2[2]/(rand_vars2[1]+rand_vars2[2])
+```
+
+## Random intercept and slope model
+```{r ex2b, size="tiny"}
+# random slope also not identifiable here
+#lme_2b <- lmer(cd4 ~ (medvl|id), data=dat2)
+```
+
+# Continuous time-dependent variables (very unbalanced data)
+
+## Read in data
+```{r prelim3, size="tiny"}
+dat3=read_csv("deeks_ex3.csv")
+tbl_df(dat3)
+```
+
+## Random Intercept Model
+```{r ex3a, size="tiny"}
+# random intercept
+lme_3 <- lmer(cd4 ~ logvlbase+logvlchange + (1|id), data=dat3)
+summary(lme_3)
+```
+
+## post-estimation stats
+```{r ex3astats, size="tiny"} 
+# ICC - var(b0i)/(var(b0i)+var(eij))
+icc(lme_3)
+AIC(lme_3)
+# Now do by grabbing relevant objects
+rand_vars3 <- re_var(lme_3)
+rand_vars3
+```
+
+## Random intercept and slope model
+```{r ex3b, size="tiny"}
+# random slope also not identifiable here
+lme_3b <- lmer(cd4 ~ logvlbase+logvlchange+(logvlchange|id), data=dat3)
+summary(lme_3b)
+```
+
+
+## post-estimation stats
+```{r ex3bstats, size="tiny"} 
+icc(lme_3b)
+AIC(lme_3b)
+rand_vars3b <- re_var(lme_3b)
+rand_vars3b
+```
+
+## Reporting the estimated distribution of associations from random coefficients model.
+```{r rand_coef, size="tiny", echo=F}
+b2hat <- fixef(lme_3b)[3]
+sdb2i <- sqrt(rand_vars3b[3])
+b2i <- seq(b2hat-3*sdb2i,b2hat+3*sdb2i,length=100)
+dist.b2i <- tibble(b2i,dens=dnorm(b2i,b2hat,sdb2i))
+ggplot(dist.b2i,aes(x=b2i,y=dens))+geom_line()+geom_vline(xintercept = b2hat)+geom_vline(xintercept = 0)+scale_x_continuous(breaks = seq(-150,50,25))
+
+```
+
+## Which model does one choose (3 or 3b)?
+```{r aic_comp, size="tiny"}
+AIC(lme_3,lme_3b)
+```
+- The random intercept and slope model has lower AIC and thus fits the data relatively better than the random intercept model alone.
+
+

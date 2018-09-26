@@ -1,0 +1,192 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Mixed Models 2'
+author: Alan Hubbard
+date: Oct 25, 2018
+output: 
+  beamer_presentation:
+    slide_level: 2  
+header-includes:
+  - \usepackage{pdfpages}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r global_options, include=FALSE}
+# This bit of code lets you set the font size
+# in heading of code junk when writing to beamer.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
+# Libraries
+library(tidyverse)
+library(lme4)
+library(sjstats)
+```
+
+## Read in data
+```{r prelim1, size="tiny"}
+dat=read_csv("phco2.csv")
+tbl_df(dat)
+```
+
+# Plot patterns among subjects
+```{r, echo=F}
+ggplot(dat,aes(x=co2,y=ph,group=id))+geom_line()
+
+```
+
+## Set of models to be fit
+1. $$Y_{ijk} = \beta_0  + \beta_1 X_{ijk}+\beta_2 X^2_{ijk}+e_{ijk}$$
+2. $$Y_{ijk} = \beta_0  + \beta_{0i}+ \beta_1 X_{ijk}+\beta_2 X^2_{ijk}+e_{ijk}$$
+3. $$Y_{ijk} = \beta_0  + \beta_{0i} + \beta_{0ij}+ \beta_1 X_{ijk}+\beta_2 X^2_{ijk}+e_{ijk}$$
+4. $$Y_{ijk} = \beta_0  + \beta_{0i}+ (\beta_1+\beta_{1i}) X_{ijk}+\beta_2 X^2_{ijk}+e_{ijk}$$
+
+## Model 1
+```{r mod1, size="tiny"}
+# Make a co2^2 variable
+dat <- dat %>% mutate(co22=co2^2)
+#  OLS
+lm_1 <- glm(ph ~ co2+co22, data=dat,family="gaussian")
+summary(lm_1)
+# Residual SD
+sigma(lm_1)
+# AIC
+AIC(lm_1)
+```
+
+## Estimates of changes in mean for different changes in CO2
+```{r post1}
+# Note, if co2 is x, then co22 is x^2
+comps=rbind(c(0,3,9),c(0,5,25),c(0,7,49))
+labels=c("3 vs 0", "5 vs. 0", "7 vs. 0")
+source("glm_post_estimate.R")
+post1 <- glm.post.estimate(lm_1,comps,labs=labels)
+post1
+```
+
+
+## Model 2
+```{r mod2, size="tiny"}
+lme_2 <- lmer(ph ~ co2+co22 + (1|id), data=dat)
+summary(lme_2)
+AIC(lme_2)
+```
+
+## Model 2 Stats
+```{r post2a, size="tiny"} 
+# ICC - var(b0i)/(var(b0i)+var(eij))
+icc(lme_2)
+AIC(lme_2)
+# Now do by grabbing relevant objects
+rand_vars2 <- re_var(lme_2)
+rand_vars2
+rand_vars2[2]/(rand_vars2[1]+rand_vars2[2])
+```
+
+
+## Estimates of changes in mean for different changes in CO2
+```{r post2b}
+source("glmer_post_estimate.R")
+post2 <- glmer.post.estimate(lme_2,comps,labs=labels,
+                            exponentiate = F)
+post2
+```
+
+## Model 3
+```{r mod3, size="tiny"}
+lme_3 <- lmer(ph ~ co2+co22 + (1|id/visit), data=dat)
+summary(lme_3)
+AIC(lme_3)
+```
+
+## Model 3 Stats
+```{r post3a, size="tiny"} 
+# ICC
+icc(lme_3)
+# Now do by grabbing relevant objects
+rand_vars3 <- re_var(lme_3)
+rand_vars3
+# ICC id
+rand_vars3[3]/(sum(rand_vars3))
+# ICC visit in id
+rand_vars3[2]/(sum(rand_vars3))
+```
+
+## Estimates of changes in mean for different changes in CO2
+```{r post3b}
+post3 <- glmer.post.estimate(lme_3,comps,
+                             labs=labels,exponentiate = F)
+post3
+```
+
+## Model 4
+```{r mod4, size="tiny"}
+lme_4 <- lmer(ph ~ co2+(co2|id)+co22, data=dat)
+summary(lme_4)
+AIC(lme_4)
+```
+
+## Model 4 Stats
+```{r post4a, size="tiny"} 
+# ICC
+icc(lme_4)
+# Now do by grabbing relevant objects
+rand_vars4 <- re_var(lme_4)
+rand_vars4
+# ICC id at Xijk=0
+rand_vars4[2]/(rand_vars4[1]+rand_vars4[2])
+```
+
+## Estimates of changes in mean for different changes in CO2
+```{r post4b}
+# Note, if co2 is x, then co22 is x^2
+post4 <- glmer.post.estimate(lme_4,comps,
+                             labs=labels,exponentiate = F)
+post4
+```
+
+## Summary stats
+
+\begin{center}
+\tiny{
+\begin{table}
+\caption{\textsc{Estimates(SE) and Akaike's Information Criterion (AIC) of four hierarchical linear mixed effects models for pH versus $C0_2$}}
+\label{ch7tab.phvsCO2}
+\vspace{0.2in}
+\begin{tabular}{ccccccccc}
+& \multicolumn{2}{c}{Model 1} & \multicolumn{2}{c}{Model 2} & \multicolumn{2}{c}{Model 3} & \multicolumn{2}{c}{Model 4} \\
+\hline
+ Parameter & Est & SE & Est & SE & Est & SE & Est & SE   \\
+\hline
+$\beta_0$ &  7.6 &   .021 &    7.6 &   .021 &    7.6 &    .021 &    7.6 &   .026  \\
+$\beta_1$ & -.14 &   .014 &   -.14 &   .008 &   -.14 &  .0080 &   -.14 &  .0076 \\
+$\beta_2$ & .0073 &  .0019 &  .0074 &  .0011 &  .0073 &  .0011 &  .0073 &   .0010 \\
+\hline
+$\sigma_{\beta_{0i}}$  &     &  &   .071 &   &   .071 &    &   .097 &    \\ \
+$\sigma_{\beta_{0ij}}$ &   &       &       &       &   .021 &    &       &       \\
+$\sigma_{\beta_{1i}}$ &   &       &       &       &       &      &  .0065 &  \\
+$\sigma_e$ &  .088 &   &   .051 &   &   .048 &   &   .047 &   \\
+\hline
+$AIC$ & -136 &       &   -143 &       &   -142 &       &   -147 &       \\ 
+\end{tabular} \\[0.5ex]
+\end{table}
+}
+\end{center}
+
+## Model vs. Association of Interest
+```{r sumfig, echo=F}
+# Clunky so don't take as inspiration for your code
+mod <- c(1,as.numeric(substr(post1[2,2],1,6)),as.numeric(substr(post1[2,1],1,6)),as.numeric(substr(post1[2,2],9,14)))
+mod <- rbind(mod,c(2,as.numeric(substr(post2[2,2],1,6)),as.numeric(substr(post2[2,1],1,6)),as.numeric(substr(post2[2,2],9,14))))
+mod <- rbind(mod,c(3,as.numeric(substr(post3[2,2],1,6)),as.numeric(substr(post3[2,1],1,6)),as.numeric(substr(post3[2,2],9,14))))
+mod <- rbind(mod,c(4,as.numeric(substr(post4[2,2],1,6)),as.numeric(substr(post4[2,1],1,6)),as.numeric(substr(post4[2,2],9,14))))
+mod <- data.frame(mod)
+names(mod) <- c("model","Y0","Y1","Y2")
+ggplot(mod,aes(x=model,y=Y0))+geom_line(linetype = "dashed")+geom_line(aes(x=model, y=Y1))+geom_line(aes(x=model, y=Y2),linetype = "dashed")+ ylab("E(Yijk | Xijk=5)-E(Yijk | Xijk=0)")+ggtitle('Estimate and 95 % CI (dashed lines)')
+
+```
+

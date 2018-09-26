@@ -1,0 +1,158 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'More GEE'
+author: Alan Hubbard
+date: Oct 23, 2018
+output: 
+  beamer_presentation:
+    slide_level: 2   
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r global_options, include=FALSE}
+# This bit of code lets you set the font size
+# in heading of code junk when writing to beamer.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+# Libraries
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(gee)
+library(cowplot)
+library(data.table)
+```
+
+
+## Intro
+- We will examine 3 different analyses all from the CD4/HIV data.
+- For each, we will compare
+    + standard linear regression ignoring repeated measures
+    + standard linear regression using GEE to adjust inference robustly to account for repeated measures (GEE with independence working correlation, robust variance)
+    + GEE with exchangeable working correlation, naive variance
+    + GEE with exchangealbe working correlation, robust variance
+- Purpose is to compare
+    + coefficient estimates comparing independence and different correlation model, and
+    + inference comparing robust versus naive (assuming model is correct) versus robust (agnostic correlation model)
+
+# Binary time-independent variable (balanced data)
+
+## Read in data
+```{r prelim1, size="tiny"}
+dat1=read_csv("deeks_ex1.csv")
+tbl_df(dat1)
+```
+
+## Independence Working Correlation
+```{r ex1, size="tiny"}
+# independence
+gee_ind=gee_fit <- gee(cd4 ~ binage, id, data=dat1,family=gaussian, corstr = "independence")
+# Make easier to read summary
+ss1 <- data.frame(summary(gee_fit)$coefficients)
+ss1 = data.frame(ss1,pvalue=2*(1-pnorm(abs(ss1[,5]))))
+round(ss1,4)
+```
+
+## Exchangeable
+```{r ex1b, size="tiny"}
+gee_exc <- gee(cd4 ~ binage, id, data=dat1,family=gaussian, corstr = "exchangeable")
+# Make easier to read summary
+ss2 <- data.frame(summary(gee_exc)$coefficients)
+ss2 = data.frame(ss2,pvalue=2*(1-pnorm(abs(ss2[,5]))))
+round(ss2,4)
+```    
+
+# Binary time-dependent variable (balanced data)
+## Read in data
+```{r prelim2, size="tiny"}
+dat2=read_csv("deeks_ex2.csv")
+tbl_df(dat2)
+```
+
+## Independence Working Correlation
+```{r ex2, size="tiny"}
+# independence
+gee_ind <- gee(cd4 ~ medvl, id, data=dat2,family=gaussian, corstr = "independence")
+# Make easier to read summary
+ss1 <- data.frame(summary(gee_ind)$coefficients)
+ss1 = data.frame(ss1,pvalue=2*(1-pnorm(abs(ss1[,5]))))
+round(ss1,4)
+```
+
+## Exchangeable
+```{r ex2b, size="tiny"}
+gee_exc <- gee(cd4 ~ medvl, id, data=dat2,family=gaussian, corstr = "exchangeable")
+# Make easier to read summary
+ss2 <- data.frame(summary(gee_exc)$coefficients)
+ss2 = data.frame(ss2,pvalue=2*(1-pnorm(abs(ss2[,5]))))
+round(ss2,4)
+
+```    
+
+
+# Continuous time-dependent variables (very unbalanced data)
+
+## Read in data
+```{r prelim3, size="tiny"}
+dat3=read_csv("deeks_ex3.csv")
+tbl_df(dat3)
+```
+
+## Independence Working Correlation
+
+```{r ex3, size="tiny"}
+# independence
+gee_ind <- gee(cd4 ~ logvlbase+logvlchange, id, data=dat3,na.action=na.omit, family=gaussian, corstr = "independence")
+# Make easier to read summary
+ss1 <- data.frame(summary(gee_ind)$coefficients)
+ss1 = data.frame(ss1,pvalue=2*(1-pnorm(abs(ss1[,5]))))
+round(ss1,4)
+```
+
+## Exchangeable
+```{r ex3b, size="tiny"}
+gee_exc <- gee(cd4 ~ logvlbase+logvlchange, id, data=dat3,na.action=na.omit, family=gaussian, corstr = "exchangeable")
+# Make easier to read summary
+ss2 <- data.frame(summary(gee_exc)$coefficients)
+ss2 = data.frame(ss2,pvalue=2*(1-pnorm(abs(ss2[,5]))))
+round(ss2,4)
+```    
+
+
+## Why large differences in estimates returned by same linear model, but different working correlation models
+- Exchangeable will tends to give more influence to subjects with fewer observations relative to independence working correlation.
+- Below, we use code from chapter 2 using tge data.table package to estimate the slope of CD4 versus logVL by id.
+- First, make a variable that is the log(VL), which is simply baseline value plus change.
+- We look at the subset of id's that have at least 10 repeated observations.
+- We then plot the distribution of slopes.
+
+
+
+## Histogram of estimated slopes
+```{r slopesbyid, size="tiny", echo=F}
+# Data.table again
+dat3_expl <- dat3 %>% group_by(id) %>% mutate(logVLt = logvlbase+logvlchange) %>% mutate(num_dist = n_distinct(logVLt))
+dat3_sht <- data.table(subset(dat3_expl, num_dist>10))
+out <- as.tibble(dat3_sht[,as.list(coef(lm(cd4 ~ logVLt,na.action = na.omit))),by=.(id)])
+p1 <- ggplot(out,aes(x=logVLt))+  geom_histogram(bins=15,col="black",fill="white")+
+  ggtitle("Distribution of estimated slopes of logVL vs. CD4")+
+  labs(x="slope")+ 
+  theme(plot.title = element_text(size=12)) +
+  geom_vline(xintercept=mean(out$logVLt,na.rm = T))
+p1
+```
+
+## Results
+- See that the mean of the slopes is close to that found in the exchangeable gee analysis above.
+- Implies that the exchangeable working correlation gives something closer to equal weights to individuals than the independence.
+-Independence gives more weight to individuals with more observations.
+
+
+
+
+

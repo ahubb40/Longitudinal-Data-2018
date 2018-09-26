@@ -1,0 +1,78 @@
+---
+title: "Assignment 4: OLS and GEE"
+subtitle: "UC Berkeley: PH 242C/STAT 247C"
+date: Fall 2018
+output: pdf_document
+---
+
+### Purpose: To compare estimation techniques (OLS vs. GEE) for the mean outcome and to compare variance estimation procedures associated with each mean outcome estimation technique.
+
+## I. Bivariate Analysis
+
+In this lab,  we would like to investigate whether the trends are different in the patients who received the "Succimer" treatment vs.  the "Placebo"" treatment. In this lab, we would like you to use the lead.dta dataset and put it into long form.  As a check, you should have 400 observations, 4 each on 100 individuals
+
+### 1) Create a hypothesis for yourself about whether the trend in lead levels is the same between the "Succimer" and "Placebo" groups. State the hypothesis here:
+
+
+### 2) Estimate  the  linear  relationship  between  treatment  type  (trt)  and lead  levels  (y).   Please  do  this several times, by running the following regression models and filling in the table below:
+
+
+* Run a naive ordinary least squares (OLS) regression. (hint: use the \texttt{lm()} function)
+* Run a generalized estimating equations (GEE) model that is equivalent to the naive OLS regression. (hint: use function \texttt{gee()}, and specify the correlation structure appropriately)
+* Run a GEE model that uses a robust estimate of the variance of the estimation procedure.
+* Run an OLS regression where the estimate of the variance takes into account the clustering within children. (hint: use the function \texttt{lm()} and study the \texttt{lmtest} and \texttt{sandwich} packages)
+* Use the non-parametric bootstrap to get an estimate of the variance. Do this twice, the first time specifying 50 repetitions, and the second time specifying 1,000 repetitions. (hint: Consider using the \texttt{cluster.boot()} function in the \texttt{multiwayvcov} package, or the material in the Chapter 2 Graphics Supplement on the cluster bootstrap, or any other function you can find to perform the clustered bootstrap).
+
+Model | Estimate: ($\hat{\beta}$) | Standard Error ($se(\hat{\beta})$)
+------------- | ------------- | ------------- 
+OLS (Naive SE) |  | 
+GEE (Naive SE) |  | 
+GEE (Robust SE) |  | 
+OLS (Cluster SE) |  | 
+OLS (Cluster, Boostrap 50) |  | 
+OLS (Cluster, Boostrap 1,000) |  | 
+
+### 3) Using the table above and your class notes, answer the following questions:
+
+#### a) Which estimation techniques produced the same estimate of the mean outcome?
+
+#### b) Which estimation techniques produced the same (to the 2nd decimal point) estimate of the standard error?
+
+#### c) Which of the bootstrapped variance estimates do you trust more? Why?
+
+#### d) What do we mean when we say "robust" standard errors?
+
+#### e) Which estimation technique and variance estimation technique would you recommend that the study designers implement if they want an unbiased estimate? If they want accurate (within reason) variance?
+
+#### f) Did any of the six estimation procedures you followed produce different substantive results? What is the conclusion from any of these models?
+
+\newpage
+
+## II. Multivariate Analysis
+
+In  Labs 8  and 9 we  used  the Schizophrenia dataset  to  investigate  the  relationships  between  drug treatment and severity of illness over time, and as a demonstration of mixed models and GEEs.
+
+Here, we would like to investigate the relationship between treatment and average severity of illness, controlling for gender, using schizophrenia.dta.
+
+### 1) Begin by reading in the dataset.  The data is already in long format, but we need to do a bit of cleaning. Drop all observations whose value of week is 2, 4, 5.  This is to make the data more balanced. (hint:this should have dropped 34 observations).
+
+### 2) Create an interaction variable, called \texttt{ix}, for the interaction between drug and gender. 
+
+### 3) Fill out the table below with the results for the coefficient on \texttt{drug} from the six regression models. This time, you are still doing a linear regression fit, using \texttt{severity} as the outcome and the variables \texttt{drug, gender}, and \texttt{ix} as predictors. (It is okay to specify the interaction in the model formula rather than using the \texttt{ix} variable).
+
+Model | Estimate: ($\hat{\beta}$) | Standard Error ($se(\hat{\beta})$)
+------------- | ------------- | ------------- 
+OLS (Naive SE) |  | 
+GEE (Naive SE) |  | 
+GEE (Robust SE) |  | 
+OLS (Cluster SE) |  | 
+OLS (Cluster, Boostrap 50) |  | 
+OLS (Cluster, Boostrap 1,000) |  | 
+
+### 4) Using the table above and your class notes, answer the following questions:
+
+#### a)  From  a  data-generating  mechanistic  point  of  view,  why  did  we include  an  interaction  between gender and drug?  Was this interaction statistically significant?  Should we report gender-specific treatment effects?
+
+#### b) Answer question 3, parts (a), (b), and (e) from Part I in this dataset. Do your answers to those questions hold up in this analysis?
+
+#### c) Interpret the coefficient and 95\% confidence interval on the term \texttt{drug} from the estimation technique you would recommend.
