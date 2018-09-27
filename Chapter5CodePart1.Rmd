@@ -1,0 +1,226 @@
+---
+title: 'Longitudinal Data: Repeated Measures'
+subtitle: 'Linear Models with repeated measures'
+author: Alan Hubbard
+date: Oct 2, 2018
+output: pdf_document
+#output: 
+#  slidy_presentation:
+#editor_options: 
+#  chunk_output_type: console
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Introduction
+- In last section, we concentrated on ways to reduce repeated, longitudinal outcome data into a single summary measure (e.g., count of binary repeated measures) so that standard regression procedures could be used.
+- However, in this section, we explore how linear regression can accommodate repeated measures.
+- This will lead ultimately to describing popular repeated measures procedures, like Mixed Models and Generalized Estimating Equations (GEE).
+- First, we examine data from an observational study on the size of kids mouths as they grew.
+
+---
+
+```{r readin, message=F, warning=F}
+library(dplyr)
+library(MASS)
+library(tidyverse)
+library(cowplot)
+dat <- read_csv("dental.csv")
+tbl_df(dat)
+
+```
+- child = i (id)
+- $age  = X_{ij1}$
+- $gender = X_{ij2}$: 1 is male, 0 female
+- measure of teeth $distance = Y_{ij}$
+
+---
+# Plot the data
+
+```{r plot1, message=F,echo=F}
+p1 <- ggplot(subset(dat,gender==0), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Girls")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+p2 <- ggplot(subset(dat,gender==1), aes(x=age,y=distance,group=child,color=child)) +geom_line()+ggtitle("Boys")+theme(legend.position="none")+scale_y_continuous(limits = c(15, 32))
+
+plot_grid(p1,p2)
+
+```
+
+One sees a few things in these plots:
+1. variation among outcome at start (age 8 years),
+2. increase over time, but not perfectly linear for subjects,
+3. maybe one measurement error (boy that drops from age 12 to 14).
+
+
+
+
+- If we treat county as the random unit, then this could be an example of repeated measures data and we will revist this data in later chapters. 
+- For now, we will choose a single year, 2000, as the year of our analyses examining rates of suicide and accidents as related to other factors, including previous disasters.  In stead of using dplyr to subset data before running the regression, we instead do the subseting within the regression functions. 
+
+---
+
+```{r readin, message=F, warning=F}
+library(dplyr)
+library(MASS)
+library(tidyverse)
+library(cowplot)
+# get the regression output formatting function
+source("glm_post_estimate.R")
+
+
+dat=read_csv("allstack_04_14_08.csv")
+dat=rename(dat,county_code=fips)
+# read in county identifiers
+county=read_csv("countycodes.csv")
+# merge data
+dat=left_join(dat,county, by = "county_code")
+```
+
+---
+
+## Data Exploration
+- We will examine the distribution of counts of suicide by county and their association with other factors. 
+The variable logpop00 is the natural log of the population size of the county.  
+- We examine the distribution of the variables  variables relevant to our goal, which is to determine the joint association of the number of disasters in the previous year (prev1i), the median income for the county (medinc_00), adjusting for differences in county size (logpop00).
+
+- To look at distribution of suicide rates, we first make a variable that is the rate.  Let $Y$ be the count of suicides and $T$ the population size of county, we make a new variable as the rate per 10000 people or $rate=1000*Y/T$. Then we examine histograms of the relevant variables.
+
+---
+
+```{r dat_explore1, message=F, warning=F}
+dat2000=subset(dat,year=2000) %>% 
+  mutate(totpop=exp(logpop00)) %>%      
+  mutate(suic_rate=10000*nsui/totpop)
+# given the very few observations > 10, we lump all of them at 10
+p1 <- ggplot(dat2000, aes(x=pmin(suic_rate,10)))+
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=20) +
+ geom_density(alpha=.6, fill="#FF6666",adjust=2) +ggtitle("Suicide Rate per 10000") +xlab("rate per 10000") +
+ geom_vline(xintercept=mean(dat2000$suic_rate,na.rm=T),size=1) 
+
+p2 <- ggplot(dat2000, aes(x=totpop)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=20) +
+ geom_density(alpha=.6, fill="#FF6666",adjust=2)+
+  ggtitle("County Population - line is popn mean") +xlab("n") +
+   scale_x_log10() +
+ geom_vline(xintercept=mean(dat2000$totpop,na.rm=T),size=1) 
+
+p3 <- ggplot(dat2000, aes(x=medinc_00)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=20) +
+ geom_density(alpha=.6, fill="#FF6666",adjust=2)+
+  ggtitle("Median County Income") +xlab("$") +
+ geom_vline(xintercept=mean(dat2000$medinc_00,na.rm=T),size=1) 
+
+p4 <- ggplot(dat2000, aes(x=prev1i)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=20) +
+ geom_density(alpha=.6, fill="#FF6666",adjust=2)+
+  ggtitle("Number of disaster events in 1999") +xlab("n") +
+ geom_vline(xintercept=mean(dat2000$prev1i,na.rm=T),size=1) 
+
+plot_grid(p1,p2,p3,p4)
+
+
+```
+
+---
+ 
+- One can see the suicide rate is strongly right skewed, more characteristic of a negative binomial distribution. We do not rely on particular distributions for the other variables, but such plots are good to look for outliers or other data issues. 
+
+- We next examine the relationship of the outcome to the two explanatory variables.
+
+---
+
+```{r smooths, message=F, warning=F}
+p1 <- ggplot(dat2000, aes(x=medinc_00,y=suic_rate)) + 
+ geom_smooth()+geom_point(shape="+",alpha=0.1)+ggtitle("Median income 2000") +
+  scale_y_continuous(limits = c(0, 10))
+
+
+
+p2 <- ggplot(dat2000, aes(x=prev1i,y=suic_rate)) + 
+ geom_smooth()+geom_point(shape="+",alpha=0.1)+scale_y_continuous(limits = c(0, 10))+ggtitle("# Disasters 1999")
+
+p3 <- ggplot(dat2000, aes(x=medinc_00,y=prev1i)) + 
+ geom_smooth(method = "lm", fill = NA)+geom_point(shape="+",alpha=0.1)+ggtitle("Disasters versus Income")
+
+
+plot_grid(p1,p2,p3)
+```
+
+- One can see evidence of a non-linear associaton of income and suicide rate, less so with  previous years disasters.  There also appears to be relatively week relationship between disasters and income.
+
+
+---
+
+## Poisson Regression
+
+- We now examine the association of each within a single model of $log[E(Y \mid X_1,X_2,T)] = b_0+log(T)+b_1X_1+b_2X_2$, with $X_1$ being income, $X_2$ is previous disasters.  
+
+- We do so first assuming a Poisson distribution 
+
+
+```{r pois1, message=F, warning=F}
+glm_pois <- glm(nsui~medinc_00+prev1i+offset(logpop00),data=dat2000,family=poisson())
+sum_glm_pois <- summary(glm_pois)
+sum_glm_pois
+summary(dat2000$medinc_00,na.rm=T)
+summary(dat2000$prev1i,na.rm=T)
+
+```
+
+---
+
+- Given the very large sample size, $m = `r length(glm_pois$residuals)`$ 
+it is surprising that both coefficients are not significantly different from 0: t the estimate of $\beta_1$ is `r round(coef(glm_pois)[2],2)` with p-value of `r round(sum_glm_pois$coefficients[2,4],4)`, whereas the estimate of $\beta_2$ is `r round(coef(glm_pois)[3],2)` with p-value of `r round(sum_glm_pois$coefficients[3,4],4)`.  
+
+- These coefficients are estimates of the log ratio of means for an increase in the respective variables by 1 unit.  
+- However, for both variables, 1 unit is not an interesting increase, so though associations are significant, the coefficients are small as expected.  
+- We can easily get ratios for bigger changes, say a change equivalent to the interquarile range of the predictors.  We do that below.
+
+---
+
+```{r irr_pois, message=F, warning=F}
+iqr_inc = IQR(dat2000$medinc_00,na.rm=T)
+iqr_dis = IQR(dat2000$prev1i,na.rm=T)
+# 
+comps <- rbind(c(0,iqr_inc,0),c(0,0,iqr_dis))
+irr_pois <- glm.post.estimate(glm_pois,comps,labs=c("income","disasters"),exponentiate = T)            
+irr_pois
+```
+
+- These ratios represent $exp(`r iqr_inc` * b_1)$ and $exp(`r iqr_dis` * b_2)$.  
+- Thus, an increase in income equivalent to the IQR of the distribuiton of income is associated with a `r as.numeric(irr_pois[1,1])` change in the rate of suicide (a `r 100*(1-as.numeric(irr_pois[1,1]))` \% decrease in rate) whereas an equivalnet change in number of disasters results in almost no change (ratio very close to 1).  
+- We fit the same model assuming a negative binomial (NB) distribuiton next and then compare the two fits.
+
+---
+
+## Negative binomial regression
+
+```{r nb1, message=F, warning=F}
+library(MASS)
+glm_NB <- glm.nb(nsui~medinc_00+prev1i+offset(logpop00),data=dat2000,na.action=na.omit)
+sum_glm_NB <- summary(glm_NB)
+sum_glm_NB
+irr_NB <- glm.post.estimate(glm_NB,comps,labs=c("income","disasters"),exponentiate = T)            
+irr_NB
+```
+
+- NB regression produces very similar estimates to those produced by Poisson regression, but the small change in the coefficient related to disasters now results in it being a significant associaiton.  
+
+- Like above, these ratios represent $exp(`r iqr_inc` * b_1)$ and $exp(`r iqr_dis` * b_2)$.  
+- Besides the small shift in the estimate for the ratio of means for a in crease in disasters from the POisson to Negative Binomial, one might consider the results to be significantly different.  
+- But if you look at the CI's for both, though one contains 1 and the other doesn't, it's a very small CI close to the null, thus, little evidence of a significant adjusted (for income) association of linear number of disasters and suicide rate. 
+- The the CI's returned by both Poisson and NB appear small in absolute number, they are proportionally larger for the NB regression, which is what one expects - it  typically returns more conservative inference than the Poisson assumption (implies greater residual variability). 
+
+- Equivalently, the standard errors are larger for the associations (coefficients) for the NB versus poisson, e.g.,  $SE(\beta_1) = `r round(sum_glm_NB$coefficients[2,2],2) `$ in the NB regression is much bigger than that estimated in the Poisson regression (`r round(sum_glm_pois$coefficients[2,2],2) `).
+
+---
+
+- We can also look at whether the difference is statistically significant.
+
+```{r lmtest, message=F,warning=F}
+library("lmtest")
+lrtest(glm_NB, glm_pois)
+```
+
+- The p-value is very small, suggesting that the NB is a significantly bette fit than the Poisson distribution.  This matches what one would anticipate, given the highly skewed distribution of suicide counts.
