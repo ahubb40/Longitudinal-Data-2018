@@ -3,6 +3,8 @@ title: "Assignment 4: OLS and GEE"
 subtitle: "UC Berkeley: PH 242C/STAT 247C"
 date: Fall 2018
 output: pdf_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ### Purpose: To compare estimation techniques (OLS vs. GEE) for the mean outcome and to compare variance estimation procedures associated with each mean outcome estimation technique.
@@ -11,28 +13,29 @@ output: pdf_document
 
 In this lab,  we would like to investigate whether the trends are different in the patients who received the "Succimer" treatment vs.  the "Placebo"" treatment. In this lab, we would like you to use the lead.dta dataset and put it into long form.  As a check, you should have 400 observations, 4 each on 100 individuals
 
-### 1) Create a hypothesis for yourself about whether the trend in lead levels is the same between the "Succimer" and "Placebo" groups. State the hypothesis here:
+### 1) Create a hypothesis for yourself about whether the trend in lead levels is the same between the "Succimer" and "Placebo" groups. 
+Specify a model for the mean of outcome ($Y_{ij}$) conditional on the month ($T_{ij}$) and treatment group ($X_{ij}$), or a model for $E(Y_{ij} \mid X_{ij}=x,T_{ij}=t)$
 
+In the model of the mean
+$$E(Y_{ij} \mid X_{ij}=x,T_{ij}=t) = \beta_0+\beta_1 x  + \beta_2 t + \beta_3 x*t, H_0: \beta_3=0$$
 
 ### 2) Estimate  the  linear  relationship  between  treatment  type  (trt)  and lead  levels  (y).   Please  do  this several times, by running the following regression models and filling in the table below:
 
 
 * Run a naive ordinary least squares (OLS) regression. (hint: use the \texttt{lm()} function)
-* Run a generalized estimating equations (GEE) model that is equivalent to the naive OLS regression. (hint: use function \texttt{gee()}, and specify the correlation structure appropriately)
-* Run a GEE model that uses a robust estimate of the variance of the estimation procedure.
-* Run an OLS regression where the estimate of the variance takes into account the clustering within children. (hint: use the function \texttt{lm()} and study the \texttt{lmtest} and \texttt{sandwich} packages)
-* Use the non-parametric bootstrap to get an estimate of the variance. Do this twice, the first time specifying 50 repetitions, and the second time specifying 1,000 repetitions. (hint: Consider using the \texttt{cluster.boot()} function in the \texttt{multiwayvcov} package, or the material in the Chapter 2 Graphics Supplement on the cluster bootstrap, or any other function you can find to perform the clustered bootstrap).
+* Run a generalized estimating equations (GEE) model regression accounting for repeated measures (hint: use function \texttt{gee()}, and specify the **exchangeable** correlation structure)
+* Use the non-parametric bootstrap (BS) to get an estimate of the variance. Do this twice, the first time specifying $B=50$ repetitions, and the second time specifying $B=1000$ repetitions. (hint: Consider using the \texttt{cluster.boot()} function in the \texttt{multiwayvcov} package, or the material in the Chapter 2 Graphics Supplement on the cluster bootstrap, or any other function you can find to perform the clustered bootstrap).
 
-Model | Estimate: ($\hat{\beta}$) | Standard Error ($se(\hat{\beta})$)
+
+Procedure: working cor (SE) | Estimate: ($\hat{\beta}$) | Standard Error ($se(\hat{\beta})$)
 ------------- | ------------- | ------------- 
-OLS (Naive SE) |  | 
-GEE (Naive SE) |  | 
-GEE (Robust SE) |  | 
-OLS (Cluster SE) |  | 
-OLS (Cluster, Boostrap 50) |  | 
-OLS (Cluster, Boostrap 1,000) |  | 
+OLS: (Naive SE) |  | 
+GEE: (Naive SE) |  | 
+GEE: (Robust SE) |  | 
+OLS: (BS $B=50$) |  | 
+OLS: ($B=1000$) |  | 
 
-```{r}
+```{r, echo=F, message=F}
 library(tidyverse)
 dat=read_csv("lead.csv")
 df <- dat %>% gather(yval, y, c(y0,y1,y4,y6)) %>% mutate(month=as.numeric(substr(yval,2,2))) %>% arrange(id,month)
@@ -42,14 +45,64 @@ df <- dat %>% gather(yval, y, c(y0,y1,y4,y6)) %>% mutate(month=as.numeric(substr
   unique(df$trt) #Check levels of treatment
   length(unique(df$id)) #Check the number of unique individuals in the dataset
   unique(df$month) #Check the levels of time
+  
 ```
 
 
+OLS fit
+```{r }
+df <- df %>% mutate(tx = as.numeric(trt=="Succimer")) %>% mutate(inter = tx*month)
+lm_1 <- glm(y ~ tx+month+inter, data=df,family="gaussian",na.action=na.omit)
+summary(lm_1)
+# Residual SD
+sigma(lm_1)
 ```
+
+
+GEE fit
+```{r }
+library(gee)
+gee_exc <- gee(y ~ month+tx+inter, id, data=df,family=gaussian, corstr = "exchangeable")
+# Make easier to read summary
+ss1 <- data.frame(summary(gee_exc)$coefficients)
+ss1 = data.frame(ss1,pvalue=2*(1-pnorm(abs(ss1[,5]))))
+round(ss1,4)
+
+```
+
+Clustered Bootstrap with ols 
+
+# cluster bootstrap function
+clusbootreg <- function(formula, data, cluster, reps=1000){
+  reg1 <- lm(formula, data)
+  clusters <- names(table(cluster))
+  sterrs <- matrix(NA, nrow=reps, ncol=length(coef(reg1)))
+  for(i in 1:reps){
+    index <- sample(1:length(clusters), length(clusters), replace=TRUE)
+    aa <- clusters[index]
+    bb <- table(aa)
+    bootdat <- NULL
+    for(j in 1:max(bb)){
+      cc <- data[cluster %in% names(bb[bb %in% j]),]
+      for(k in 1:j){
+        bootdat <- rbind(bootdat, cc)
+      }
+    }
+    sterrs[i,] <- coef(lm(formula, bootdat))
+  }
+  val <- cbind(coef(reg1),apply(sterrs,2,sd))
+  colnames(val) <- c("Estimate","Std. Error")
+  return(val)
+}
+
+> clusbootreg(formula=y~x, data=dat, cluster=dat$g, reps=1000) #correct StErrs
+Estimate Std. Error
+(Intercept) 4.963447 0.03197737
+x           2.027469 0.02920071
 
 ### 3) Using the table above and your class notes, answer the following questions:
 
-#### a) Which estimation techniques produced the same estimate of the mean outcome?
+#### a) Which estimation techniques produced the same estimates of the coefficient of interest?
 
 #### b) Which estimation techniques produced the same (to the 2nd decimal point) estimate of the standard error?
 
@@ -59,7 +112,6 @@ df <- dat %>% gather(yval, y, c(y0,y1,y4,y6)) %>% mutate(month=as.numeric(substr
 
 #### e) Which estimation technique and variance estimation technique would you recommend that the study designers implement if they want an unbiased estimate? If they want accurate (within reason) variance?
 
-#### f) Did any of the six estimation procedures you followed produce different substantive results? What is the conclusion from any of these models?
 
 
 ### 4) Mixed models
